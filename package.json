@@ -1,7 +1,7 @@
 {
   "name": "yester-ext",
   "displayName": "Yester-ext",
-  "description": "",
+  "description": "A VS Code extension for interacting with local LLM models",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.96.0"
@@ -15,7 +15,7 @@
     "commands": [
       {
         "command": "yester-ext.start",
-        "title": "Chat with DeepSeek"
+        "title": "Start Yester Extension"
       }
     ]
   },
@@ -39,6 +39,7 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "ollama": "^0.5.12"
   }
 }
