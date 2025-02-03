@@ -130,4 +130,3 @@ function getWebviewContent(): string {
 export function deactivate() {}
 
 
-

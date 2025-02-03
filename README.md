@@ -1,71 +1,65 @@
-# yester-ext README
+# Yester VS Code Extension
 
-This is the README for your extension "yester-ext". After writing up a brief description, we recommend including the following sections.
+Yester is a Visual Studio Code extension that integrates with local machine learning models using the Ollama API. It allows you to interact with large language models (LLMs) directly from within VS Code through a simple chat interface.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Model Selection:** Choose from a list of available LLM models to use for chatting.
+- **Real-time Responses:** Get streaming responses from the selected model as you interact.
+- **Customizable Interface:** A simple webview interface where you can enter prompts and see model responses in real-time.
+- **Local Model Integration:** Leverages Ollama's API for local models, making it possible to run this extension offline.
 
-For example if there is an image subfolder under your extension project workspace:
+## Installation
 
-\!\[feature X\]\(images/feature-x.png\)
+1. Ensure that you have [Node.js](https://nodejs.org/) and [Visual Studio Code](https://code.visualstudio.com/) installed.
+2. Clone this repository to your local machine:
+   ```bash
+   git clone https://github.com/yourusername/yester-vscode-extension.git
+   ```
+3. Install the necessary dependencies:
+   ```bash
+   npm install
+   ```
+4. Open the extension in VS Code:
+   ```bash
+   code .
+   ```
+5. Press `F5` to run and activate the extension in the VS Code Extension Development Host.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## Usage
 
-## Requirements
+1. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS) to open the command palette.
+2. Type `Yester: Start` and select the command to activate the chat interface.
+3. Select a model from the list of available models.
+4. Start typing your prompt in the text box and click "Ask" to get a response from the model.
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## Available Models
 
-## Extension Settings
+- `deepseek-r1:14b`
+- `deepseek-r1:32b`
+- `deepseek-r1:70b`
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+(You can easily add more models to the `availableModels` array in the code.)
 
-For example:
+## Development
 
-This extension contributes the following settings:
+To make changes to the extension, follow these steps:
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+1. Make sure you have [VS Code Extension Development Tools](https://code.visualstudio.com/docs/extensions/developing-extensions) set up.
+2. Make changes to the code.
+3. Test your changes by pressing `F5` to open a new VS Code window with the extension loaded.
+4. Package your extension using the following command:
+   ```bash
+   vsce package
+   ```
 
-## Known Issues
+## Dependencies
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+- `dotenv`: Loads environment variables from a `.env` file.
+- `vscode`: Provides VS Code APIs for extension development.
+- `ollama`: Integrates with Ollama's local chat API for LLM responses.
 
-## Release Notes
+## License
 
-Users appreciate release notes as you update your extension.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
