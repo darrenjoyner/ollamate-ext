@@ -1,42 +1,85 @@
+import * as dotenv from 'dotenv';
 import * as vscode from 'vscode';
 import ollama from 'ollama';
-;
+
+dotenv.config();
+
+// Define available models for selection
+const availableModels = [
+    { name: 'deepseek-r1:14b'},
+    { name: 'deepseek-r1:32b'},
+    { name: 'deepseek-r1:70b'},
+    // Add more models as needed
+];
 
 export function activate(context: vscode.ExtensionContext) {
-    const disposable = vscode.commands.registerCommand('yester-ext.start', () => {
-        const panel = vscode.window.createWebviewPanel(
-            'deepChat',
-            'Deep Seek Chat',
-            vscode.ViewColumn.One,
-            { enableScripts: true }
-        );
+    const disposable = vscode.commands.registerCommand('yester-ext.start', async () => {
+        // Prompt user to select a model
+        const selectedModelName = await promptForModelSelection();
+        if (!selectedModelName) { return; } // Handle cancellation
 
+        // Store the selected model in the extension context
+        context.workspaceState.update('selectedModel', selectedModelName);
+
+        const panel = vscode.window.createWebviewPanel(
+            'yester',
+            'LLM Chat',
+            vscode.ViewColumn.One,
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+            }
+        );
+        
         panel.webview.html = getWebviewContent();
 
+        // Listen for messages from the webview (user input)
         panel.webview.onDidReceiveMessage(async (message: any) => {
             if (message.command === 'chat') {
                 const userPrompt = message.text;
                 try {
+                    // Call ollama.chat directly for local model
                     const streamResponse = await ollama.chat({
-                        model: 'deepseek-r1:14b',
+                        model: selectedModelName,
                         messages: [{ role: 'user', content: userPrompt }],
                         stream: true
                     });
 
+                    // Send the response parts to the webview
                     for await (const part of streamResponse) {
-                        panel.webview.postMessage({ command: 'chatResponse', text: part.message.content });
+                        panel.webview.postMessage({
+                            command: 'chatResponse',
+                            text: part.message.content
+                        });
                     }
                 } catch (error) {
-                    panel.webview.postMessage({ command: 'chatResponse', text: `Error: ${String(error)}` });
-                    console.error('Chat error:', error);
+                    console.error('Error in chat:', error);
+                    panel.webview.postMessage({
+                        command: 'chatResponse',
+                        text: 'An error occurred while processing your request.'
+                    });
                 }
-            } else if (message.command === 'close') {
-                panel.dispose();
             }
         });
+
+        // Initially inform the webview it's ready to chat
+        panel.webview.postMessage({ command: 'chatResponse', text: 'Webview is ready to chat!' });
     });
 
     context.subscriptions.push(disposable);
+}
+
+async function promptForModelSelection(): Promise<string | undefined> {
+    const options = availableModels.map(model => ({
+        label: model.name,
+    }));
+
+    const result = await vscode.window.showQuickPick(options, {
+        canPickMany: false,
+        title: 'Select a model'
+    });
+
+    return result?.label;
 }
 
 function getWebviewContent(): string {
@@ -85,4 +128,5 @@ function getWebviewContent(): string {
 }
 
 export function deactivate() {}
+
 
