@@ -5,6 +5,19 @@ import ollama from 'ollama';
 
 dotenv.config();
 
+class ModelHandler {
+    private _selectedModelName: string = '';
+
+    get selectedModelName(): string {
+        return this._selectedModelName;
+    }
+
+    set selectedModelName(model: string) {
+        this._selectedModelName = model;
+        console.log(`Model set to: ${model}`);
+    }
+}
+
 // Define available models for selection
 const availableModels = [
     { name: 'deepseek-r1:14b'},
@@ -14,13 +27,18 @@ const availableModels = [
 ];
 
 export function activate(context: vscode.ExtensionContext) {
+    const handler = new ModelHandler();
     const disposable = vscode.commands.registerCommand('yester-ext.start', async () => {
         // Prompt user to select a model
-        const selectedModelName = await promptForModelSelection();
-        if (!selectedModelName) { return; } // Handle cancellation
+        const llm = await promptForModelSelection(); // Await the async call
+        if (llm) {
+            handler.selectedModelName = llm; // Safe assignment
+        } else {
+            console.warn('No model selected.');
+        }
 
         // Store the selected model in the extension context
-        context.workspaceState.update('selectedModel', selectedModelName);
+        context.workspaceState.update('selectedModel', handler.selectedModelName);
 
         const panel = vscode.window.createWebviewPanel(
             'yester',
@@ -36,31 +54,50 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Listen for messages from the webview (user input)
         panel.webview.onDidReceiveMessage(async (message: any) => {
-            if (message.command === 'chat') {
-                const userPrompt = message.text;
-                try {
-                    // Call ollama.chat directly for local model
-                    const streamResponse = await ollama.chat({
-                        model: selectedModelName,
-                        messages: [{ role: 'user', content: userPrompt }],
-                        stream: true
-                    });
-
-                    // Send the response parts to the webview
-                    for await (const part of streamResponse) {
+            switch(message.command) { 
+                case 'chat': { 
+                    const userPrompt = message.text;
+                    try {
+                        // Call ollama.chat directly for local model
+                        const streamResponse = await ollama.chat({
+                            model: handler.selectedModelName,
+                            messages: [{ role: 'user', content: userPrompt }],
+                            stream: true
+                        });
+    
+                        // Send the response parts to the webview
+                        for await (const part of streamResponse) {
+                            panel.webview.postMessage({
+                                command: 'chatResponse',
+                                text: part.message.content
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Error in chat:', error);
                         panel.webview.postMessage({
                             command: 'chatResponse',
-                            text: part.message.content
+                            text: 'An error occurred while processing your request.'
                         });
+                    } 
+                   break; 
+                } 
+                case 'manager': {
+                    const llm = await promptForModelSelection(); // Prompt the user for model selection
+                    if (llm) {
+                        handler.selectedModelName = llm; // Safe assignment
+                        console.log(`Model selected: ${llm}`);
+                        await context.workspaceState.update('selectedModel', handler.selectedModelName);
+                    } else {
+                        console.warn('No model selected.');
                     }
-                } catch (error) {
-                    console.error('Error in chat:', error);
-                    panel.webview.postMessage({
-                        command: 'chatResponse',
-                        text: 'An error occurred while processing your request.'
-                    });
+                    break; // Ensure proper case termination
                 }
-            }
+                
+                default: {
+                    break;
+                }
+                 
+            } 
         });
 
         // Initially inform the webview it's ready to chat

@@ -14,6 +14,7 @@ export function getAppViewContent(): string {
         <h2>Deep VS Code</h2>
         <textarea id="prompt" rows="3" placeholder="Ask something..."></textarea><br>
         <button id="askBtn">Ask</button>
+        <button id="managerBtn">LLM Manager</button>
         <div id="response"></div>
 
         <script>
@@ -24,6 +25,10 @@ export function getAppViewContent(): string {
                 if (text.trim() === '') return; // Prevent empty requests
                 document.getElementById('response').textContent = "Generating response...";
                 vscode.postMessage({ command: 'chat', text });
+            });
+
+            document.getElementById('managerBtn').addEventListener('click', () => {
+                vscode.postMessage({ command: 'manager'});
             });
 
             window.addEventListener('message', function(event) {
