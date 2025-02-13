@@ -1,30 +1,40 @@
-export interface Model {
-    name: string;
-}
+import * as vscode from 'vscode';
 
-let availableModels: Model[] = [];
+export class ModelHandler {
+    private _selectedModelName: string = '';
 
-export function loadModels(): Model[] {
-    return availableModels.length ? availableModels : [];
-}
+    get selectedModelName(): string {
+        return this._selectedModelName;
+    }
 
-export function saveModels(models: Model[]) {
-    availableModels = models;
-}
-
-export function addModel(name: string) {
-    if (!availableModels.some(model => model.name === name)) {
-        availableModels.push({ name });
-        saveModels(availableModels);
+    set selectedModelName(model: string) {
+        this._selectedModelName = model;
+        console.log(`Model set to: ${model}`);
     }
 }
 
-export function deleteModel(name: string) {
-    availableModels = availableModels.filter(m => m.name !== name);
-    saveModels(availableModels);
+// Define available models for selection
+const availableModels = [
+    { name: 'deepseek-r1:14b' },
+    { name: 'deepseek-r1:32b' },
+    { name: 'deepseek-r1:70b' },
+    // Add more models as needed
+];
+export async function promptForModelSelection(panel?: vscode.WebviewPanel): Promise<string | undefined> {
+    const options = availableModels.map(model => ({
+        label: model.name,
+    }));
+
+    const result = await vscode.window.showQuickPick(options, {
+        canPickMany: false,
+        title: 'Select a model'
+    });
+
+    if (result?.label && panel) {
+        panel.webview.postMessage({ command: 'updateModel', model: result.label });
+    }
+
+    return result?.label;
 }
 
-export function getAvailableModels(): Model[] {
-    return availableModels;
-}
 

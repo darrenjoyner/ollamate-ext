@@ -1,126 +1,116 @@
 import { getAppViewContent } from './appView';
+import { getManagerViewContent } from './managerView';
+import { ModelHandler, promptForModelSelection } from './modelManager';
 import * as dotenv from 'dotenv';
 import * as vscode from 'vscode';
 import ollama from 'ollama';
 
 dotenv.config();
 
-class ModelHandler {
-    private _selectedModelName: string = '';
+let modelMenu: vscode.WebviewPanel | undefined; // Declare globally
+let panel: vscode.WebviewPanel | undefined; // Ensure this is at the top
 
-    get selectedModelName(): string {
-        return this._selectedModelName;
-    }
+// Function to handle Model Menu messages
+async function handleModelMenuMessage(message: any, context: vscode.ExtensionContext, handler: ModelHandler) {
+    if (message.command === 'load' && modelMenu) {  
+        const llm = await promptForModelSelection(modelMenu);
+        if (llm) {
+            handler.selectedModelName = llm;
+            context.workspaceState.update('selectedModel', llm);
+            modelMenu.webview.postMessage({ command: 'updateModel', model: llm });
 
-    set selectedModelName(model: string) {
-        this._selectedModelName = model;
-        console.log(`Model set to: ${model}`);
+            if (panel) {
+                panel.webview.postMessage({ command: 'updateModel', model: llm });
+            } else {
+                console.warn("⚠️ Chat panel is not open, model change won't be visible immediately.");
+            }
+
+            console.log("✅ Model updated:", llm);
+        }
+    } else if (message.command === 'save') {
+        console.log("🚀 ~ Save Command Triggered");
+    } else if (message.command === 'delete') {
+        console.log("🚀 ~ Delete Command Triggered");
     }
 }
 
-// Define available models for selection
-const availableModels = [
-    { name: 'deepseek-r1:14b'},
-    { name: 'deepseek-r1:32b'},
-    { name: 'deepseek-r1:70b'},
-    // Add more models as needed
-];
+// Function to open the Model Manager Panel
+function openModelManagerPanel(context: vscode.ExtensionContext, handler: ModelHandler) {
+    if (!modelMenu) {
+        modelMenu = vscode.window.createWebviewPanel(
+            'modelMenu',
+            'Model Manager',
+            vscode.ViewColumn.One,
+            { enableScripts: true }
+        );
+
+        modelMenu.onDidDispose(() => {
+            modelMenu = undefined;
+        });
+
+        modelMenu.webview.onDidReceiveMessage((message) => handleModelMenuMessage(message, context, handler));
+    }
+
+    modelMenu.webview.html = getManagerViewContent();
+}
 
 export function activate(context: vscode.ExtensionContext) {
     const handler = new ModelHandler();
+
     const disposable = vscode.commands.registerCommand('yester-ext.start', async () => {
-        // Prompt user to select a model
-        const llm = await promptForModelSelection(); // Await the async call
-        if (llm) {
-            handler.selectedModelName = llm; // Safe assignment
-        } else {
-            console.warn('No model selected.');
-        }
-
-        // Store the selected model in the extension context
-        context.workspaceState.update('selectedModel', handler.selectedModelName);
-
-        const panel = vscode.window.createWebviewPanel(
+        panel = vscode.window.createWebviewPanel(
             'yester',
             'LLM Chat',
             vscode.ViewColumn.Beside,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-            }
+            { enableScripts: true, retainContextWhenHidden: true }
         );
-        
+
+        // Set the WebView content first
         panel.webview.html = getAppViewContent();
 
-        // Listen for messages from the webview (user input)
+        // Ensure the WebView is fully loaded before sending updates
+        setTimeout(async () => {
+            const llm = await promptForModelSelection(panel);
+            if (llm) {
+                handler.selectedModelName = llm;
+                context.workspaceState.update('selectedModel', llm);
+                panel?.webview.postMessage({ command: 'updateModel', model: llm });
+            }
+        }, 300); // Small delay to ensure WebView is ready
+
         panel.webview.onDidReceiveMessage(async (message: any) => {
-            switch(message.command) { 
-                case 'chat': { 
-                    const userPrompt = message.text;
-                    try {
-                        // Call ollama.chat directly for local model
-                        const streamResponse = await ollama.chat({
-                            model: handler.selectedModelName,
-                            messages: [{ role: 'user', content: userPrompt }],
-                            stream: true
-                        });
-    
-                        // Send the response parts to the webview
-                        for await (const part of streamResponse) {
-                            panel.webview.postMessage({
-                                command: 'chatResponse',
-                                text: part.message.content
-                            });
-                        }
-                    } catch (error) {
-                        console.error('Error in chat:', error);
-                        panel.webview.postMessage({
+            if (message.command === 'chat') {
+                const userPrompt = message.text;
+                try {
+                    const streamResponse = await ollama.chat({
+                        model: handler.selectedModelName,
+                        messages: [{ role: 'user', content: userPrompt }],
+                        stream: true
+                    });
+
+                    for await (const part of streamResponse) {
+                        panel?.webview.postMessage({
                             command: 'chatResponse',
-                            text: 'An error occurred while processing your request.'
+                            text: part.message.content
                         });
-                    } 
-                   break; 
-                } 
-                case 'manager': {
-                    const llm = await promptForModelSelection(); // Prompt the user for model selection
-                    if (llm) {
-                        handler.selectedModelName = llm; // Safe assignment
-                        console.log(`Model selected: ${llm}`);
-                        await context.workspaceState.update('selectedModel', handler.selectedModelName);
-                    } else {
-                        console.warn('No model selected.');
                     }
-                    break; // Ensure proper case termination
+                } catch (error) {
+                    console.error('Error in chat:', error);
+                    panel?.webview.postMessage({
+                        command: 'chatResponse',
+                        text: 'An error occurred while processing your request.'
+                    });
                 }
-                
-                default: {
-                    break;
-                }
-                 
-            } 
+            } else if (message.command === 'manager') {
+                openModelManagerPanel(context, handler);
+            }
         });
 
-        // Initially inform the webview it's ready to chat
+        // Send initial ready message
         panel.webview.postMessage({ command: 'chatResponse', text: 'Webview is ready to chat!' });
     });
 
     context.subscriptions.push(disposable);
 }
 
-//TODO: work in models.ts
-async function promptForModelSelection(): Promise<string | undefined> {
-    const options = availableModels.map(model => ({
-        label: model.name,
-    }));
-
-    const result = await vscode.window.showQuickPick(options, {
-        canPickMany: false,
-        title: 'Select a model'
-    });
-
-    return result?.label;
-}
-
 export function deactivate() {}
-
-
