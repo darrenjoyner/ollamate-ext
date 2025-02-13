@@ -37,10 +37,12 @@ async function handleModelMenuMessage(message: any, context: vscode.ExtensionCon
 // Function to open the Model Manager Panel
 function openModelManagerPanel(context: vscode.ExtensionContext, handler: ModelHandler) {
     if (!modelMenu) {
+        const activeColumn = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined;
+
         modelMenu = vscode.window.createWebviewPanel(
             'modelMenu',
             'Model Manager',
-            vscode.ViewColumn.One,
+            activeColumn ? activeColumn + 1 : vscode.ViewColumn.Beside,  // Open to the right
             { enableScripts: true }
         );
 
@@ -49,8 +51,9 @@ function openModelManagerPanel(context: vscode.ExtensionContext, handler: ModelH
         });
 
         modelMenu.webview.onDidReceiveMessage((message) => handleModelMenuMessage(message, context, handler));
+    } else {
+        modelMenu.reveal();  // Ensure it reveals beside the chat panel
     }
-
     modelMenu.webview.html = getManagerViewContent();
 }
 
@@ -58,25 +61,30 @@ export function activate(context: vscode.ExtensionContext) {
     const handler = new ModelHandler();
 
     const disposable = vscode.commands.registerCommand('yester-ext.start', async () => {
-        panel = vscode.window.createWebviewPanel(
+        const panel = vscode.window.createWebviewPanel(
             'yester',
             'LLM Chat',
             vscode.ViewColumn.Beside,
             { enableScripts: true, retainContextWhenHidden: true }
         );
 
+        panel.onDidDispose(() => {
+            if (modelMenu) {
+                modelMenu.dispose();
+                modelMenu = undefined;
+            }
+        });
+
         // Set the WebView content first
         panel.webview.html = getAppViewContent();
 
         // Ensure the WebView is fully loaded before sending updates
-        setTimeout(async () => {
-            const llm = await promptForModelSelection(panel);
-            if (llm) {
-                handler.selectedModelName = llm;
-                context.workspaceState.update('selectedModel', llm);
-                panel?.webview.postMessage({ command: 'updateModel', model: llm });
-            }
-        }, 300); // Small delay to ensure WebView is ready
+        const llm = await promptForModelSelection(panel);
+        if (llm) {
+            handler.selectedModelName = llm;
+            context.workspaceState.update('selectedModel', llm);
+            panel.webview.postMessage({ command: 'updateModel', model: llm });
+        }
 
         panel.webview.onDidReceiveMessage(async (message: any) => {
             if (message.command === 'chat') {
@@ -89,14 +97,14 @@ export function activate(context: vscode.ExtensionContext) {
                     });
 
                     for await (const part of streamResponse) {
-                        panel?.webview.postMessage({
+                        panel.webview.postMessage({
                             command: 'chatResponse',
                             text: part.message.content
                         });
                     }
                 } catch (error) {
                     console.error('Error in chat:', error);
-                    panel?.webview.postMessage({
+                    panel.webview.postMessage({
                         command: 'chatResponse',
                         text: 'An error occurred while processing your request.'
                     });
