@@ -1,40 +1,80 @@
 import * as vscode from 'vscode';
 
 export class ModelHandler {
-    private _selectedModelName: string = '';
+    constructor(private context: vscode.ExtensionContext) {}
 
-    get selectedModelName(): string {
-        return this._selectedModelName;
+    get selectedModelName(): string | undefined {
+        return this.context.globalState.get('selectedModel');
     }
 
     set selectedModelName(model: string) {
-        this._selectedModelName = model;
+        this.context.globalState.update('selectedModel', model);
         console.log(`Model set to: ${model}`);
+    }
+
+    get availableModels(): string[] {
+        return this.context.globalState.get('availableModels', []);
+    }
+
+    set availableModels(models: string[]) {
+        this.context.globalState.update('availableModels', models);
     }
 }
 
-// Define available models for selection
-const availableModels = [
-    { name: 'deepseek-r1:14b' },
-    { name: 'deepseek-r1:32b' },
-    { name: 'deepseek-r1:70b' },
-    // Add more models as needed
-];
-export async function promptForModelSelection(panel?: vscode.WebviewPanel): Promise<string | undefined> {
-    const options = availableModels.map(model => ({
-        label: model.name,
-    }));
+export async function handleModelMenuMessage(
+    message: any, 
+    context: vscode.ExtensionContext, 
+    handler: ModelHandler,
+    modelMenu?: vscode.WebviewPanel,
+    panel?: vscode.WebviewPanel
+) {
+    if (message.command === 'load') {
+        const selectedModel = await promptForModelSelection(context);
+        handler.selectedModelName = selectedModel ?? 'default-model';
+        
+        // Update both panels
+        modelMenu?.webview.postMessage({ command: 'updateModel', model: handler.selectedModelName });
+        panel?.webview.postMessage({ command: 'updateModel', model: handler.selectedModelName });
+
+        console.log('✅ Model updated:', handler.selectedModelName);
+    }
+}
+
+// Function to initialize models in globalState
+export async function initializeModels(context: vscode.ExtensionContext) {
+    const handler = new ModelHandler(context);
+    if (handler.availableModels.length === 0) {
+        const addDefaults = await vscode.window.showQuickPick(['Yes', 'No'], {
+            placeHolder: 'Add a default model to your manager?',
+        });
+        if (addDefaults === 'Yes') {
+            handler.availableModels = ['deepseek-r1:14b', 'deepseek-r1:32b', 'deepseek-r1:70b'];
+            vscode.window.showInformationMessage('Default models added.');
+        }
+    }
+}
+
+// Function to prompt user for model selection
+export async function promptForModelSelection(
+    context: vscode.ExtensionContext,
+    panel?: vscode.WebviewPanel
+): Promise<string | undefined> {
+    const handler = new ModelHandler(context);
+    const models = handler.availableModels;
+
+    const options = models.map(name => ({ label: name }));
 
     const result = await vscode.window.showQuickPick(options, {
         canPickMany: false,
         title: 'Select a model'
     });
 
-    if (result?.label && panel) {
-        panel.webview.postMessage({ command: 'updateModel', model: result.label });
+    if (result?.label) {
+        handler.selectedModelName = result.label;
+        if (panel) {
+            panel.webview.postMessage({ command: 'updateModel', model: result.label });
+        }
     }
 
     return result?.label;
 }
-
-

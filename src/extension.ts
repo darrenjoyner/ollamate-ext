@@ -1,120 +1,64 @@
 import { getAppViewContent } from './appView';
 import { getManagerViewContent } from './managerView';
-import { ModelHandler, promptForModelSelection } from './modelManager';
+import { 
+    ModelHandler, 
+    handleModelMenuMessage, 
+    initializeModels, 
+    promptForModelSelection 
+} from './modelManager';
 import * as dotenv from 'dotenv';
 import * as vscode from 'vscode';
 import ollama from 'ollama';
 
 dotenv.config();
 
-let modelMenu: vscode.WebviewPanel | undefined; // Declare globally
-let panel: vscode.WebviewPanel | undefined; // Ensure this is at the top
+let modelMenu: vscode.WebviewPanel | undefined;
+let panel: vscode.WebviewPanel | undefined;
 
-// Function to handle Model Menu messages
-async function handleModelMenuMessage(message: any, context: vscode.ExtensionContext, handler: ModelHandler) {
-    if (message.command === 'load' && modelMenu) {  
-        const llm = await promptForModelSelection(modelMenu);
-        if (llm) {
-            handler.selectedModelName = llm;
-            context.workspaceState.update('selectedModel', llm);
-            modelMenu.webview.postMessage({ command: 'updateModel', model: llm });
-
-            if (panel) {
-                panel.webview.postMessage({ command: 'updateModel', model: llm });
-            } else {
-                console.warn("⚠️ Chat panel is not open, model change won't be visible immediately.");
-            }
-
-            console.log("✅ Model updated:", llm);
-        }
-    } else if (message.command === 'save') {
-        console.log("🚀 ~ Save Command Triggered");
-    } else if (message.command === 'delete') {
-        console.log("🚀 ~ Delete Command Triggered");
-    }
-}
-
-// Function to open the Model Manager Panel
 function openModelManagerPanel(context: vscode.ExtensionContext, handler: ModelHandler) {
     if (!modelMenu) {
-        const activeColumn = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined;
-
-        modelMenu = vscode.window.createWebviewPanel(
-            'modelMenu',
-            'Model Manager',
-            activeColumn ? activeColumn + 1 : vscode.ViewColumn.Beside,  // Open to the right
-            { enableScripts: true }
-        );
-
-        modelMenu.onDidDispose(() => {
-            modelMenu = undefined;
-        });
-
-        modelMenu.webview.onDidReceiveMessage((message) => handleModelMenuMessage(message, context, handler));
+        modelMenu = vscode.window.createWebviewPanel('modelMenu', 'Model Manager', vscode.ViewColumn.Beside, { enableScripts: true });
+        modelMenu.onDidDispose(() => (modelMenu = undefined));
+        modelMenu.webview.onDidReceiveMessage(
+            (msg) => handleModelMenuMessage(msg, context, handler, modelMenu, panel)
+        );        
+        modelMenu.webview.html = getManagerViewContent();
     } else {
-        modelMenu.reveal();  // Ensure it reveals beside the chat panel
+        modelMenu.reveal();
     }
-    modelMenu.webview.html = getManagerViewContent();
 }
 
-export function activate(context: vscode.ExtensionContext) {
-    const handler = new ModelHandler();
+export async function activate(context: vscode.ExtensionContext) {
+    await initializeModels(context);
+    const handler = new ModelHandler(context);
 
     const disposable = vscode.commands.registerCommand('yester-ext.start', async () => {
-        const panel = vscode.window.createWebviewPanel(
-            'yester',
-            'LLM Chat',
-            vscode.ViewColumn.Beside,
-            { enableScripts: true, retainContextWhenHidden: true }
-        );
-
-        panel.onDidDispose(() => {
-            if (modelMenu) {
-                modelMenu.dispose();
-                modelMenu = undefined;
-            }
-        });
-
-        // Set the WebView content first
+        panel = vscode.window.createWebviewPanel('yester', 'LLM Chat', vscode.ViewColumn.Beside, { enableScripts: true, retainContextWhenHidden: true });
+        panel.onDidDispose(() => (panel = undefined));
         panel.webview.html = getAppViewContent();
 
-        // Ensure the WebView is fully loaded before sending updates
-        const llm = await promptForModelSelection(panel);
-        if (llm) {
-            handler.selectedModelName = llm;
-            context.workspaceState.update('selectedModel', llm);
-            panel.webview.postMessage({ command: 'updateModel', model: llm });
-        }
+        handler.selectedModelName = (await promptForModelSelection(context, panel)) ?? 'default-model';
 
-        panel.webview.onDidReceiveMessage(async (message: any) => {
-            if (message.command === 'chat') {
-                const userPrompt = message.text;
+        panel.webview.onDidReceiveMessage(async message => {
+            if (message.command === 'chat' && panel) {
                 try {
-                    const streamResponse = await ollama.chat({
-                        model: handler.selectedModelName,
-                        messages: [{ role: 'user', content: userPrompt }],
+                    const modelName = handler.selectedModelName ?? 'default-model';
+                    for await (const part of await ollama.chat({
+                        model: modelName,
+                        messages: [{ role: 'user', content: message.text }],
                         stream: true
-                    });
-
-                    for await (const part of streamResponse) {
-                        panel.webview.postMessage({
-                            command: 'chatResponse',
-                            text: part.message.content
-                        });
+                    })) {
+                        panel.webview.postMessage({ command: 'chatResponse', text: part.message.content });
                     }
                 } catch (error) {
-                    console.error('Error in chat:', error);
-                    panel.webview.postMessage({
-                        command: 'chatResponse',
-                        text: 'An error occurred while processing your request.'
-                    });
+                    console.error('Chat error:', error);
+                    panel.webview.postMessage({ command: 'chatResponse', text: 'Error processing your request.' });
                 }
             } else if (message.command === 'manager') {
                 openModelManagerPanel(context, handler);
             }
         });
 
-        // Send initial ready message
         panel.webview.postMessage({ command: 'chatResponse', text: 'Webview is ready to chat!' });
     });
 
