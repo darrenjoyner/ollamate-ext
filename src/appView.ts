@@ -1,5 +1,5 @@
 export function getAppViewContent(): string {
-    return /*html*/`
+  return /*html*/ `
     <!DOCTYPE html>
     <html lang="en">
     <head>

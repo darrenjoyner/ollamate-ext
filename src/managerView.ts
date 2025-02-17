@@ -1,5 +1,5 @@
 export function getManagerViewContent(): string {
-    return /*html*/`
+  return /*html*/ `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -24,7 +24,7 @@ export function getManagerViewContent(): string {
     <body>
         <h2>Menu</h2>
         <button id="loadBtn">Load</button>
-        <button id="saveBtn">Save</button>
+        <button id="add Btn">Add </button>
         <button id="deleteBtn">Delete</button>
     
         <script>
@@ -34,8 +34,8 @@ export function getManagerViewContent(): string {
                 vscode.postMessage({ command: 'load' });
             });
     
-            document.getElementById('saveBtn').addEventListener('click', () => {
-                vscode.postMessage({ command: 'save' });
+            document.getElementById('addBtn').addEventListener('click', () => {
+                vscode.postMessage({ command: 'add ' });
             });
     
             document.getElementById('deleteBtn').addEventListener('click', () => {
@@ -49,6 +49,5 @@ export function getManagerViewContent(): string {
             });
         </script>
     </body>
-    </html>    
-`;
+    </html>`;
 }
