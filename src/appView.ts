@@ -23,7 +23,7 @@ export function getAppViewContent(): string {
             document.getElementById('askBtn').addEventListener('click', () => {
                 const text = document.getElementById('prompt').value;
                 if (text.trim() === '') return; // Prevent empty requests
-                document.getElementById('response').textContent = "Generating response...";
+                document.getElementById('response').textContent = "Generating response... ";
                 vscode.postMessage({ command: 'chat', text });
             });
 

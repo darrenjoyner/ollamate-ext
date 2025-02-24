@@ -23,6 +23,33 @@ export class ModelHandler {
   }
 }
 
+async function addModel(context: vscode.ExtensionContext) {
+  const handler = new ModelHandler(context);
+
+  const modelObj: { model?: string; useSelectedModel?: string } = {};
+
+  const model = await vscode.window.showInputBox({
+    prompt: "Enter model name",
+    placeHolder: "Model 123",
+  });
+
+  if (!model) {
+    vscode.window.showErrorMessage("No model entered!");
+  } else {
+    modelObj.model = model;
+
+    const useSelectedModel = await vscode.window.showQuickPick(["Yes", "No"], {
+      placeHolder: "Use entered model?",
+    });
+    modelObj.useSelectedModel = useSelectedModel;
+
+    handler.availableModels = [...handler.availableModels, model];
+    console.log("✅ Model added:", handler.selectedModelName);
+  }
+
+  return modelObj;
+}
+
 export async function handleModelMenuMessage(
   message: any,
   context: vscode.ExtensionContext,
@@ -45,6 +72,25 @@ export async function handleModelMenuMessage(
     });
 
     console.log("✅ Model updated:", handler.selectedModelName);
+  }
+
+  //TODO: selectedModelName does not give the correct error. Consider moving the panel into it own func...
+  if (message.command === "add") {
+    const addedModel = await addModel(context);
+
+    if (addedModel.useSelectedModel === "Yes") {
+      handler.selectedModelName = addedModel.model ?? "default-model";
+      modelMenu?.webview.postMessage({
+        command: "updateModel",
+        model: handler.selectedModelName,
+      });
+      panel?.webview.postMessage({
+        command: "updateModel",
+        model: handler.selectedModelName,
+      });
+
+      console.log("✅ Model updated:", handler.selectedModelName);
+    }
   }
 }
 

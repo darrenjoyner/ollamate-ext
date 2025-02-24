@@ -29,9 +29,19 @@ export async function activate(context: vscode.ExtensionContext) {
       panel.onDidDispose(() => (panel = undefined));
       panel.webview.html = getAppViewContent();
 
-      handler.selectedModelName =
-        (await promptForModelSelection(context, panel)) ?? "default-model";
+      const selectedModel = await promptForModelSelection(context, panel);
 
+      if (selectedModel) {
+        handler.selectedModelName = selectedModel;
+      } else {
+        // Send message to panel informing the user to enter a model
+        panel.webview.postMessage({
+          command: "chatResponse",
+          text: "Enter a model. ",
+        });
+        // Optionally, set a default value
+        handler.selectedModelName = "default-model";
+      }
       panel.webview.onDidReceiveMessage(async (message) => {
         if (message.command === "chat" && panel) {
           try {
@@ -48,20 +58,34 @@ export async function activate(context: vscode.ExtensionContext) {
             }
           } catch (error) {
             console.error("Chat error:", error);
-            panel.webview.postMessage({
-              command: "chatResponse",
-              text: "Error processing your request.",
-            });
+
+            const errorMessage =
+              error && typeof error === "object" && "message" in error
+                ? (error as { message: string }).message
+                : "An unknown error occurred.";
+
+            if (selectedModel === undefined) {
+              panel.webview.postMessage({
+                command: "chatResponse",
+                text: "No model selected.",
+              });
+            } else {
+              panel.webview.postMessage({
+                command: "chatResponse",
+                text: errorMessage,
+              });
+            }
           }
         } else if (message.command === "manager") {
           openModelManagerPanel(context, handler, panel);
         }
       });
-
-      panel.webview.postMessage({
-        command: "chatResponse",
-        text: "Webview is ready to chat!",
-      });
+      if (selectedModel !== undefined) {
+        panel.webview.postMessage({
+          command: "chatResponse",
+          text: "Model is ready to chat!",
+        });
+      }
     }
   );
 
