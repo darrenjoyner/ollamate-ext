@@ -11,7 +11,7 @@ export function getAppViewContent(): string {
         </style>
     </head>
     <body>
-        <h2 id="title">yester <span id="modelName">(Model)</span></h2>
+        <h2 id="title">yester <span id="modelName">(No Model)</span></h2>
         <textarea id="prompt" rows="3" placeholder="Ask something..."></textarea><br>
         <button id="askBtn">Ask</button>
         <button id="managerBtn">LLM Manager</button>

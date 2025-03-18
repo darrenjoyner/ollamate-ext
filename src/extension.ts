@@ -40,12 +40,12 @@ export async function activate(context: vscode.ExtensionContext) {
           text: "Enter a model. ",
         });
         // Optionally, set a default value
-        handler.selectedModelName = "default-model";
+        handler.selectedModelName = "No Model";
       }
       panel.webview.onDidReceiveMessage(async (message) => {
         if (message.command === "chat" && panel) {
           try {
-            const modelName = handler.selectedModelName ?? "default-model";
+            const modelName = handler.selectedModelName ?? "No Model";
             for await (const part of await ollama.chat({
               model: modelName,
               messages: [{ role: "user", content: message.text }],

@@ -50,6 +50,33 @@ async function addModel(context: vscode.ExtensionContext) {
   return modelObj;
 }
 
+async function deleteModel(
+  context: vscode.ExtensionContext,
+  handler: ModelHandler
+): Promise<string> {
+  const previousModel = handler.selectedModelName ?? "";
+  const selectedModel = await promptForModelSelection(context);
+
+  if (!selectedModel) {
+    // Handle case where no model is selected (e.g., log, show a message, or return early)
+    vscode.window.showWarningMessage("No model selected for deletion.");
+    return previousModel;
+  }
+
+  // Remove from availableModels
+  handler.availableModels = handler.availableModels.filter(
+    (model) => model !== selectedModel
+  );
+
+  if (handler.selectedModelName === selectedModel) {
+    vscode.window.showInformationMessage(`Model "${selectedModel}" deleted.`);
+    handler.selectedModelName = "";
+    return "";
+  }
+
+  return previousModel;
+}
+
 export async function handleModelMenuMessage(
   message: any,
   context: vscode.ExtensionContext,
@@ -59,7 +86,7 @@ export async function handleModelMenuMessage(
 ) {
   if (message.command === "load") {
     const selectedModel = await promptForModelSelection(context);
-    handler.selectedModelName = selectedModel ?? "default-model";
+    handler.selectedModelName = selectedModel ?? "No Model";
 
     // Update both panels
     modelMenu?.webview.postMessage({
@@ -74,12 +101,11 @@ export async function handleModelMenuMessage(
     console.log("✅ Model updated:", handler.selectedModelName);
   }
 
-  //TODO: selectedModelName does not give the correct error. Consider moving the panel into it own func...
   if (message.command === "add") {
     const addedModel = await addModel(context);
 
     if (addedModel.useSelectedModel === "Yes") {
-      handler.selectedModelName = addedModel.model ?? "default-model";
+      handler.selectedModelName = addedModel.model ?? "No Model";
       modelMenu?.webview.postMessage({
         command: "updateModel",
         model: handler.selectedModelName,
@@ -92,11 +118,53 @@ export async function handleModelMenuMessage(
       console.log("✅ Model updated:", handler.selectedModelName);
     }
   }
+
+  if (message.command === "delete") {
+    const deletedModel = await deleteModel(context, handler);
+
+    if (deletedModel === "") {
+      const useSelectedModel = await vscode.window.showQuickPick(
+        ["Yes", "No"],
+        {
+          placeHolder: "Use entered model?",
+        }
+      );
+
+      if (useSelectedModel === "Yes") {
+        const selectedModel = await promptForModelSelection(context);
+        handler.selectedModelName = selectedModel ?? "No Model";
+
+        // Update both panels
+        modelMenu?.webview.postMessage({
+          command: "updateModel",
+          model: handler.selectedModelName,
+        });
+        panel?.webview.postMessage({
+          command: "updateModel",
+          model: handler.selectedModelName,
+        });
+
+        console.log("✅ Model updated:", handler.selectedModelName);
+      } else {
+        handler.selectedModelName = "No Model";
+
+        modelMenu?.webview.postMessage({
+          command: "updateModel",
+          model: handler.selectedModelName,
+        });
+        panel?.webview.postMessage({
+          command: "updateModel",
+          model: handler.selectedModelName,
+        });
+      }
+    }
+  }
 }
 
 // Function to initialize models in globalState
 export async function initializeModels(context: vscode.ExtensionContext) {
   const handler = new ModelHandler(context);
+
   if (handler.availableModels.length === 0) {
     const addDefaults = await vscode.window.showQuickPick(["Yes", "No"], {
       placeHolder: "Add a default model to your manager?",
