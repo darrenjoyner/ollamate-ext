@@ -24,7 +24,8 @@ export function getManagerViewContent(): string {
     <body>
         <h2>Menu</h2>
         <button id="loadBtn">Load</button>
-        <button id="add Btn">Add </button>
+        <button id="addBtn">Add </button>
+        <button id="importBtn">Import</button>
         <button id="deleteBtn">Delete</button>
     
         <script>
@@ -35,12 +36,17 @@ export function getManagerViewContent(): string {
             });
     
             document.getElementById('addBtn').addEventListener('click', () => {
-                vscode.postMessage({ command: 'add ' });
+                vscode.postMessage({ command: 'add' });
             });
     
+            document.getElementById('importBtn').addEventListener('click', () => {
+                vscode.postMessage({ command: 'import' });
+            });
+
             document.getElementById('deleteBtn').addEventListener('click', () => {
                 vscode.postMessage({ command: 'delete' });
             });
+
     
             document.addEventListener('keydown', function(event) {
                 if (event.key === 'Escape') {

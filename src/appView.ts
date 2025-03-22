@@ -11,7 +11,7 @@ export function getAppViewContent(): string {
         </style>
     </head>
     <body>
-        <h2 id="title">yester <span id="modelName">(Model)</span></h2>
+        <h2 id="title">yester <span id="modelName">(No Model)</span></h2>
         <textarea id="prompt" rows="3" placeholder="Ask something..."></textarea><br>
         <button id="askBtn">Ask</button>
         <button id="managerBtn">LLM Manager</button>
@@ -23,7 +23,7 @@ export function getAppViewContent(): string {
             document.getElementById('askBtn').addEventListener('click', () => {
                 const text = document.getElementById('prompt').value;
                 if (text.trim() === '') return; // Prevent empty requests
-                document.getElementById('response').textContent = "Generating response...";
+                document.getElementById('response').textContent = "Generating response... ";
                 vscode.postMessage({ command: 'chat', text });
             });
 
@@ -36,7 +36,7 @@ export function getAppViewContent(): string {
                 if (message.command === 'chatResponse') {
                     document.getElementById('response').textContent += message.text;
                 } else if (message.command === 'updateModel') {
-                    document.getElementById('modelName').textContent = "(" + message.model + ")";
+                    document.getElementById('modelName').textContent = "( " + message.model + " )";
                 }
             });
 
