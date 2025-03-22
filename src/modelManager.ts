@@ -55,11 +55,16 @@ async function deleteModel(
   handler: ModelHandler
 ): Promise<string> {
   const previousModel = handler.selectedModelName ?? "";
+
   const selectedModel = await promptForModelSelection(context);
 
-  if (!selectedModel) {
-    // Handle case where no model is selected (e.g., log, show a message, or return early)
+  if (!selectedModel || handler.availableModels.length === 0) {
     vscode.window.showWarningMessage("No model selected for deletion.");
+    return previousModel;
+  }
+
+  if (!handler.availableModels.includes(selectedModel)) {
+    vscode.window.showWarningMessage(`Model "${selectedModel}" not found.`);
     return previousModel;
   }
 
@@ -67,15 +72,16 @@ async function deleteModel(
   handler.availableModels = handler.availableModels.filter(
     (model) => model !== selectedModel
   );
+  vscode.window.showInformationMessage(`Model "${selectedModel}" deleted.`);
 
-  if (handler.selectedModelName === selectedModel) {
-    vscode.window.showInformationMessage(`Model "${selectedModel}" deleted.`);
+  if (previousModel === selectedModel) {
     handler.selectedModelName = "";
     return "";
   }
 
   return previousModel;
 }
+
 
 export async function handleModelMenuMessage(
   message: any,
@@ -122,41 +128,60 @@ export async function handleModelMenuMessage(
   if (message.command === "delete") {
     const deletedModel = await deleteModel(context, handler);
 
-    if (deletedModel === "") {
-      const useSelectedModel = await vscode.window.showQuickPick(
-        ["Yes", "No"],
-        {
-          placeHolder: "Use entered model?",
+    if (deletedModel === ""){
+      modelMenu?.webview.postMessage({
+        command: "updateModel",
+        model: deletedModel,
+      });
+      panel?.webview.postMessage({
+        command: "updateModel",
+        model: deletedModel,
+      });
+    }
+  }
+
+  if (message.command === "import") {
+    try {
+      let updateModels: string[] = [];
+  
+      const models = await listOllamaModels();
+      
+      for (const model of models) {
+        // Only add if the model is not already in the list
+        if (!handler.availableModels.includes(model)) {
+          updateModels.push(model);
         }
-      );
-
-      if (useSelectedModel === "Yes") {
-        const selectedModel = await promptForModelSelection(context);
-        handler.selectedModelName = selectedModel ?? "No Model";
-
-        // Update both panels
-        modelMenu?.webview.postMessage({
-          command: "updateModel",
-          model: handler.selectedModelName,
-        });
-        panel?.webview.postMessage({
-          command: "updateModel",
-          model: handler.selectedModelName,
-        });
-
-        console.log("✅ Model updated:", handler.selectedModelName);
-      } else {
-        handler.selectedModelName = "No Model";
-
-        modelMenu?.webview.postMessage({
-          command: "updateModel",
-          model: handler.selectedModelName,
-        });
-        panel?.webview.postMessage({
-          command: "updateModel",
-          model: handler.selectedModelName,
-        });
       }
+  
+      if (updateModels.length > 0) {
+        vscode.window.showInformationMessage(`${updateModels.length} model${updateModels.length === 1 ? "" : "s"} found.`);
+
+        const addOneOrAll = await vscode.window.showQuickPick(["Select", "All"], {
+          placeHolder: "Add select models or all models",
+        });
+  
+        if (addOneOrAll === "Select") {
+          const result = await vscode.window.showQuickPick(updateModels, {
+            canPickMany: true,
+            title: "Select a models",
+          });
+  
+          if (result && result.length > 0) {
+            handler.availableModels.push(...result); // Push the selected model (string)
+            vscode.window.showInformationMessage(`Models imported: ${result.join(", ")}`);
+
+          }
+        } else if (addOneOrAll === "All") {
+          handler.availableModels.push(...updateModels);
+          vscode.window.showInformationMessage(`${updateModels.length} model${updateModels.length === 1 ? "" : "s"} imported.`);
+        } else {
+          vscode.window.showInformationMessage("No models imported");
+        }
+      } else {
+        vscode.window.showInformationMessage("No models found");
+      }
+    } catch (error) {
+      console.error("Error fetching models:", error);
     }
   }
 }
@@ -170,15 +195,26 @@ export async function initializeModels(context: vscode.ExtensionContext) {
       placeHolder: "Add a default model to your manager?",
     });
     if (addDefaults === "Yes") {
-      handler.availableModels = [
-        "deepseek-r1:14b",
-        "deepseek-r1:32b",
-        "deepseek-r1:70b",
-      ];
+      handler.availableModels = await listOllamaModels();
       vscode.window.showInformationMessage("Default models added.");
     }
   }
 }
+
+async function listOllamaModels(): Promise<string[]> {
+  try {
+      const response = await fetch('http://localhost:11434/api/tags');
+      if (!response.ok) {
+          throw new Error(`Failed to fetch models: ${response.statusText}`);
+      }
+      const data = await response.json();
+      return data.models.map((model: { name: string }) => model.name);
+  } catch (error) {
+      console.error("Error fetching models:", error);
+      return []; // Return an empty array instead of throwing
+  }
+}
+
 
 export function openModelManagerPanel(
   context: vscode.ExtensionContext,

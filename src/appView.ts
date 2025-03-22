@@ -36,7 +36,7 @@ export function getAppViewContent(): string {
                 if (message.command === 'chatResponse') {
                     document.getElementById('response').textContent += message.text;
                 } else if (message.command === 'updateModel') {
-                    document.getElementById('modelName').textContent = "(" + message.model + ")";
+                    document.getElementById('modelName').textContent = "( " + message.model + " )";
                 }
             });
 
