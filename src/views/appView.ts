@@ -17,7 +17,7 @@ export function getAppViewContent(): string {
               script-src 'unsafe-inline';
           ">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>LLM Chat</title>
+            <title>Chat</title>
             <style>
                 body {
                     font-family: var(--vscode-font-family, sans-serif);
@@ -108,7 +108,7 @@ export function getAppViewContent(): string {
         </head>
         <body>
             <div class="header">
-                 <h2>LLM Chat <span id="modelName">(No Model Selected)</span></h2>
+                 <h2>Chat <span id="modelName">(No Model Selected)</span></h2>
                 <div class="buttons">
                     <button id="managerBtn" title="Open Model Manager">Manage Models</button>
                 </div>

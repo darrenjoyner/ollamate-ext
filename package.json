@@ -1,6 +1,6 @@
 {
-  "name": "yester-ext",
-  "displayName": "Yester-ext",
+  "name": "ollamate-ext",
+  "displayName": "ollamate-ext",
   "description": "A VS Code extension for interacting with local LLM models",
   "version": "0.0.1",
   "engines": {
@@ -14,8 +14,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "yester-ext.start",
-        "title": "Start Yester Extension"
+        "command": "ollamate-ext.start",
+        "title": "Start Ollamate Extension"
       }
     ]
   },

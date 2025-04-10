@@ -413,7 +413,7 @@ export function openModelManagerPanel(
   }
 
   handler.modelMenu = vscode.window.createWebviewPanel(
-    "yesterModelManager",
+    "ollamateModelManager",
     "Model Manager",
     vscode.ViewColumn.Beside,
     {

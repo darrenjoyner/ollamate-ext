@@ -19,13 +19,13 @@ let modelHandlerInstance: ModelHandler | undefined;
  * @param {interface} context 
  */
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('Extension "yester-ext" activating...');
+  console.log('Extension "ollamate-ext" activating...');
 
   await initializeModels(context);
   const handler = new ModelHandler(context);
 
   const disposable = vscode.commands.registerCommand(
-    "yester-ext.start",
+    "ollamate-ext.start",
     async () => {
       if (chatPanel) {
         chatPanel.reveal(vscode.ViewColumn.Beside);
@@ -33,8 +33,8 @@ export async function activate(context: vscode.ExtensionContext) {
       }
 
       chatPanel = vscode.window.createWebviewPanel(
-        "yesterChat",
-        "LLM Chat",
+        "ollamateChat",
+        "Chat",
         vscode.ViewColumn.Beside,
         {
           enableScripts: true,
@@ -228,14 +228,14 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(disposable);
-  console.log('Extension "yester-ext" activated.');
+  console.log('Extension "ollamate-ext" activated.');
 }
 
 /**
  * Closes extension
  */
 export function deactivate() {
-  console.log('Extension "yester-ext" deactivated.');
+  console.log('Extension "ollamate-ext" deactivated.');
   if (chatPanel) {
     chatPanel.dispose();
   } else {
