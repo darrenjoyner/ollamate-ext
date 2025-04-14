@@ -1,21 +1,32 @@
 import * as vscode from "vscode";
-import { getManagerViewContent } from "./views/managerView";
+import { EventEmitter } from 'events'; // Use Node's built-in EventEmitter
 
-export class ModelHandler {
-  modelMenu?: vscode.WebviewPanel;
-  private managerPanelDisposeListener: vscode.Disposable | undefined;
-  private chatPanelDisposeListener: vscode.Disposable | undefined;
-
-  constructor(private readonly context: vscode.ExtensionContext) {}
+/**
+ * Manages model state (selected, available) using globalState
+ * and notifies listeners of changes.
+ * @export
+ * @class ModelHandler
+ * @extends {EventEmitter}
+ */
+export class ModelHandler extends EventEmitter {
+  constructor(private readonly context: vscode.ExtensionContext) {
+      super();
+  }
 
   get selectedModelName(): string | undefined {
     const model = this.context.globalState.get<string>("selectedModel");
-    return model === "No Model" ? undefined : model;
+    return (model === "No Model" || !model) ? undefined : model;
   }
 
   set selectedModelName(model: string | undefined) {
-    this.context.globalState.update("selectedModel", model);
-    this.updateWebviews(model);
+    const oldModel = this.selectedModelName;
+    const modelToStore = model ?? "No Model";
+    this.context.globalState.update("selectedModel", modelToStore).then(() => {
+        if (oldModel !== model) {
+            console.log(`Model selection changed: ${oldModel} -> ${model}`);
+            this.emit('modelChanged', model);
+        }
+    });
   }
 
   get availableModels(): string[] {
@@ -23,107 +34,46 @@ export class ModelHandler {
   }
 
   set availableModels(models: string[]) {
+    const oldModels = this.availableModels;
     const uniqueModels = [...new Set(models)].filter(
       (m) => m && m.trim() !== ""
-    );
-    this.context.globalState.update("availableModels", uniqueModels);
-    const currentSelection = this.selectedModelName;
-    if (currentSelection && !uniqueModels.includes(currentSelection)) {
-      console.log(
-        `Selected model "${currentSelection}" is no longer available. Clearing selection.`
-      );
-      this.selectedModelName = undefined;
-    }
-    else {
-      this.updateWebviews(this.selectedModelName);
-    }
-  }
+    ).sort((a, b) => a.localeCompare(b));
 
-  /**
-   * Helper to send update messages safely
-   * @param {interface} panel 
-   * @param {string} message 
-   */
-  private postMessageToWebview(
-    panel: vscode.WebviewPanel | undefined,
-    message: any
-  ) {
-    panel?.webview?.postMessage(message)?.then(
-      (success) => {
-        // Optional: Log success or handle specific success scenarios if needed
-        // if (!success) { console.warn(`Posting message may have failed for panel: ${panel?.title}`); }
-      },
-      (error) =>
-        console.error(
-          `Error posting message to ${panel?.title ?? "unknown panel"}:`,
-          error
-        )
-    );
-  }
+    const hasChanged = JSON.stringify(oldModels) !== JSON.stringify(uniqueModels);
 
-  /**
-   * Centralized function to update relevant webviews
-   * @param {string} selectedModel
-   */
-  public updateWebviews(selectedModel: string | undefined) {
-    const modelDisplay = selectedModel ?? "No Model Selected";
+    if (hasChanged) {
+        console.log("Available models list changed.");
+        this.context.globalState.update("availableModels", uniqueModels).then(() => {
+            const currentSelection = this.selectedModelName;
 
-    this.postMessageToWebview(this.modelMenu, {
-      command: "updateModel",
-      model: modelDisplay,
-      availableModels: this.availableModels,
-    });
-  }
-
-  /**
-   * Method to clear listener references
-   */
-  public clearListeners() {
-    this.managerPanelDisposeListener?.dispose();
-    this.managerPanelDisposeListener = undefined;
-    this.chatPanelDisposeListener?.dispose();
-    this.chatPanelDisposeListener = undefined;
-  }
-
-  /**
-   * Method to set up disposal logic for the manager panel
-   * @param {interface} chatPanel 
-   * @returns 
-   */
-  public setupManagerPanelDisposal(chatPanel: vscode.WebviewPanel | undefined) {
-    if (!this.modelMenu) {
-      return;
-    }
-
-    this.clearListeners();
-
-    this.managerPanelDisposeListener = this.modelMenu.onDidDispose(() => {
-      console.log("Model Manager panel disposed.");
-      this.modelMenu = undefined;
-      this.clearListeners();
-    });
-    this.context.subscriptions.push(this.managerPanelDisposeListener);
-
-    if (chatPanel) {
-      this.chatPanelDisposeListener = chatPanel.onDidDispose(() => {
-        console.log("Chat panel disposed, disposing manager panel as well.");
-        this.modelMenu?.dispose();
-      });
+            if (currentSelection && !uniqueModels.includes(currentSelection)) {
+                console.log(
+                    `Selected model "${currentSelection}" is no longer available after list update. Clearing selection.`
+                );
+                this.selectedModelName = undefined;
+            }
+            this.emit('listChanged', uniqueModels);
+        });
     }
   }
 }
 
-// --- Model Management Functions ---
-
 /**
- * Initialize Models if there are not any
- * @param {interface} context 
+ * Model Management Functions
+ * These functions now primarily interact with the ModelHandler instance.
+ * Checks initial model state on activation.
+ * @export
+ * @param {vscode.ExtensionContext} context
+ * @param {ModelHandler} handler
  */
-export async function initializeModels(context: vscode.ExtensionContext) {
-  const handler = new ModelHandler(context);
-  if (handler.availableModels.length === 0) {
-    console.log("No available models found in global state.");
+export async function initializeModels(context: vscode.ExtensionContext, handler: ModelHandler) {
+  const available = handler.availableModels;
+  const selected = handler.selectedModelName;
 
+  console.log(`Initializing models. Available: ${available.length}, Selected: ${selected ?? 'None'}`);
+
+  if (available.length === 0) {
+    console.log("No available models found in global state during initialization.");
     const addDefaults = await vscode.window.showInformationMessage(
         "No models configured. Would you like to try importing models from Ollama?",
         "Yes", "No"
@@ -131,14 +81,7 @@ export async function initializeModels(context: vscode.ExtensionContext) {
     if (addDefaults === "Yes") {
         await importOllamaModels(context, handler);
     }
-  } else {
-    console.log(
-      `Found ${handler.availableModels.length} models in global state.`
-    );
-  }
-
-  const selected = handler.selectedModelName;
-  if (selected && !handler.availableModels.includes(selected)) {
+  } else if (selected && !available.includes(selected)) {
     console.warn(
       `Selected model "${selected}" no longer exists in available list. Clearing selection.`
     );
@@ -147,12 +90,13 @@ export async function initializeModels(context: vscode.ExtensionContext) {
 }
 
 /**
- * Add model to the list
- * @param {interface} context 
- * @param {object} handler 
- * @returns {string}
+ * Adds a model name manually via input box.
+ * @export
+ * @param {vscode.ExtensionContext} context
+ * @param {ModelHandler} handler
+ * @return {*}  {Promise<void>}
  */
-async function addModel(
+export async function addModelManually(
   context: vscode.ExtensionContext,
   handler: ModelHandler
 ): Promise<void> {
@@ -167,37 +111,31 @@ async function addModel(
       if (handler.availableModels.includes(trimmedValue)) {
         return `Model "${trimmedValue}" already exists in the list.`;
       }
-      // Optional: Add more validation if needed
-      // if (!value.includes(':') && value !== 'default') {
-      //     return "Model name should ideally include a tag (e.g., model:tag)";
-      // }
       return null;
     },
     ignoreFocusOut: true,
   });
 
-  if (!modelName || modelName.trim().length === 0) {
+  if (modelName && modelName.trim().length > 0) {
+    const trimmedModelName = modelName.trim();
+    handler.availableModels = [...handler.availableModels, trimmedModelName];
+    vscode.window.showInformationMessage(
+      `Model "${trimmedModelName}" added to list.`
+    );
+  } else {
     vscode.window.showInformationMessage("Model addition cancelled.");
-    return;
   }
-
-  const trimmedModelName = modelName.trim();
-
-  handler.availableModels = [...handler.availableModels, trimmedModelName];
-
-  vscode.window.showInformationMessage(
-    `Model "${trimmedModelName}" added to available list. Use 'Select/Load Model' to use it.`
-  );
 }
 
 /**
- * Delete model
- * @param {object} _context 
- * @param {object} handler 
- * @returns {string}
+ * Deletes a model from the list via quick pick.
+ * @export
+ * @param {vscode.ExtensionContext} context
+ * @param {ModelHandler} handler
+ * @return {*}  {Promise<void>}
  */
-async function deleteModel(
-  _context: vscode.ExtensionContext,
+export async function deleteModel(
+  context: vscode.ExtensionContext,
   handler: ModelHandler
 ): Promise<void> {
   const models = handler.availableModels;
@@ -209,277 +147,167 @@ async function deleteModel(
   const modelToDelete = await vscode.window.showQuickPick(models, {
     placeHolder: "Select a model to delete from the list",
     title: "Delete Model",
+    ignoreFocusOut: true,
   });
 
-  if (!modelToDelete) {
+  if (modelToDelete) {
+    handler.availableModels = models.filter((model) => model !== modelToDelete);
+    vscode.window.showInformationMessage(
+      `Model "${modelToDelete}" removed from the list.`
+    );
+  } else {
     vscode.window.showInformationMessage("Model deletion cancelled.");
-    return;
   }
-
-  handler.availableModels = models.filter((model) => model !== modelToDelete);
-
-  vscode.window.showInformationMessage(
-    `Model "${modelToDelete}" removed from the list.`
-  );
 }
 
 /**
- * Function to fetch models from Ollama (using fetch API)
- * @returns 
+ * Fetches model list from Ollama API.
+ * @export
+ * @return {*}  {Promise<string[]>}
  */
 export async function listOllamaModels(): Promise<string[]> {
   try {
-    // Consider making the URL configurable via settings
-    const response = await fetch("http://localhost:11434/api/tags");
+    // TODO: Make URL configurable via settings
+    const ollamaUrl = vscode.workspace.getConfiguration('ollamate').get<string>('ollamaApiUrl') ?? "http://localhost:11434";
+    const response = await fetch(`${ollamaUrl}/api/tags`);
     if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error(
-          `Ollama API endpoint not found at ${response.url}. Is Ollama running and accessible?`
-        );
-      }
-      throw new Error(
-        `Failed to fetch models from Ollama: ${response.status} ${response.statusText}`
-      );
+        if (response.status === 404) {
+             throw new Error(`Ollama API endpoint not found at ${response.url}. Is Ollama running and accessible? Check extension settings.`);
+        } else if (response.status >= 500) {
+             throw new Error(`Ollama server error (${response.status}). Check Ollama server logs.`);
+        } else {
+            throw new Error(`Failed to fetch models from Ollama: ${response.status} ${response.statusText}`);
+        }
     }
     const data = await response.json();
     if (!data || !Array.isArray(data.models)) {
       throw new Error("Invalid response format received from Ollama /api/tags");
     }
-
-    return data.models.map((model: { name: string }) => model.name);
+    return data.models.map((model: { name: string }) => model.name).sort();
   } catch (error: any) {
     console.error("Error listing Ollama models:", error);
 
-    vscode.window.showErrorMessage(
-      `Could not list models from Ollama: ${error.message}`
-    );
+    if (error instanceof Error) {
+      vscode.window.showErrorMessage(
+        `Could not list models from Ollama: ${error.message}`
+      );
+    } else {
+       vscode.window.showErrorMessage(
+        `An unknown error occurred while contacting Ollama.`
+      );
+    }
     return [];
   }
 }
 
 /**
- * Refined: Import models from Ollama
- * @param {interface} _context 
- * @param {object} handler 
- * @returns 
+ * Imports models found in Ollama installation into the available list.
+ * @export
+ * @param {vscode.ExtensionContext} context
+ * @param {ModelHandler} handler
+ * @return {*}  {Promise<void>}
  */
-async function importOllamaModels(
-  _context: vscode.ExtensionContext,
+export async function importOllamaModels(
+  context: vscode.ExtensionContext,
   handler: ModelHandler
 ): Promise<void> {
-  vscode.window.showInformationMessage(
-    "Checking Ollama for installed models..."
-  );
-  const ollamaModels = await listOllamaModels();
+  await vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: "Importing Ollama Models",
+      cancellable: false
+  }, async (progress) => {
+      progress.report({ message: "Fetching models from Ollama..." });
+      const ollamaModels = await listOllamaModels();
 
-  if (ollamaModels.length === 0) {
-    if (!vscode.window.state.focused) {
-      vscode.window.showInformationMessage(
-        "No models found installed in Ollama."
-      );
-    }
-    return;
-  }
-
-  const currentAvailable = handler.availableModels;
-  const newModels = ollamaModels.filter((m) => !currentAvailable.includes(m));
-
-  if (newModels.length === 0) {
-    vscode.window.showInformationMessage(
-      "All installed Ollama models are already in your available list."
-    );
-    return;
-  }
-
-  const choice = await vscode.window.showQuickPick(
-    [
-      {
-        label: "Import All",
-        description: `Add all ${newModels.length} new models`,
-      },
-      {
-        label: "Select Models...",
-        description: "Choose which new models to add",
-      },
-      { label: "Cancel", description: "Do not import any models now" },
-    ],
-    {
-      title: `${newModels.length} new model(s) found in Ollama`,
-      ignoreFocusOut: true,
-    }
-  );
-
-  if (!choice || choice.label === "Cancel") {
-    vscode.window.showInformationMessage("Model import cancelled.");
-    return;
-  }
-
-  if (choice.label === "Import All") {
-    handler.availableModels = [...currentAvailable, ...newModels];
-    vscode.window.showInformationMessage(
-      `Imported ${newModels.length} model(s) from Ollama.`
-    );
-  } else if (choice.label === "Select Models...") {
-    const modelsToImport = await vscode.window.showQuickPick(newModels, {
-      canPickMany: true,
-      title: "Select New Ollama Models to Import",
-      placeHolder: "Choose models to add to your list",
-      ignoreFocusOut: true,
-    });
-
-    if (modelsToImport && modelsToImport.length > 0) {
-      handler.availableModels = [...currentAvailable, ...modelsToImport];
-      vscode.window.showInformationMessage(
-        `Imported ${modelsToImport.length} selected model(s).`
-      );
-    } else {
-      vscode.window.showInformationMessage("No models selected for import.");
-    }
-  }
-}
-
-/**
- * Handle messages from the Manager webview
- * @param {string} message 
- * @param {interface} context 
- * @param {object} handler 
- * @param {interface} chatPanel 
- */
-export async function handleModelMenuMessage(
-  message: any,
-  context: vscode.ExtensionContext,
-  handler: ModelHandler,
-  chatPanel: vscode.WebviewPanel | undefined
-) {
-  console.log("Received message from manager webview:", message.command);
-  switch (message.command) {
-    case "load": {
-      // <--- Add opening brace
-      const selected = await promptForModelSelection(context, chatPanel);
-      if (selected) {
-        handler.selectedModelName = selected;
-        vscode.window.showInformationMessage(`Model "${selected}" selected.`);
-      } else {
-        vscode.window.showInformationMessage("Model selection cancelled.");
+      if (ollamaModels.length === 0) {
+          vscode.window.showInformationMessage("No models currently installed in Ollama.");
+          return;
       }
-      break;
-    }
 
-    case "add": {
-      await addModel(context, handler);
-      break;
-    }
+      const currentAvailable = handler.availableModels;
+      const newModels = ollamaModels.filter((m) => !currentAvailable.includes(m));
 
-    case "delete": {
-      await deleteModel(context, handler);
-      break;
-    }
+      if (newModels.length === 0) {
+          vscode.window.showInformationMessage("All installed Ollama models are already in your list.");
+          return;
+      }
 
-    case "import": {
-      await importOllamaModels(context, handler);
-      break;
-    }
+      progress.report({ message: `Found ${newModels.length} new models...` });
 
-    case "getModel": {
-      handler.updateWebviews(handler.selectedModelName);
-      break;
-    }
-
-    default:
-      console.warn(
-        "Received unknown command from manager webview:",
-        message.command
+      const choice = await vscode.window.showQuickPick(
+          [
+              { label: "$(add) Import All", description: `Add all ${newModels.length} new models` },
+              { label: "$(list-selection) Select Models...", description: "Choose which new models to add" },
+              { label: "$(close) Cancel", description: "Do not import any models now" },
+          ],
+          { title: `${newModels.length} new model(s) found in Ollama`, ignoreFocusOut: true }
       );
-  }
+
+      if (!choice || choice.label.includes("Cancel")) {
+          vscode.window.showInformationMessage("Model import cancelled.");
+          return;
+      }
+
+      let importedCount = 0;
+      if (choice.label.includes("Import All")) {
+          handler.availableModels = [...currentAvailable, ...newModels];
+          importedCount = newModels.length;
+      } else if (choice.label.includes("Select Models")) {
+          const modelsToImport = await vscode.window.showQuickPick(
+              newModels.map(m => ({ label: m })),
+              { canPickMany: true, title: "Select New Ollama Models to Import", placeHolder: "Choose models to add", ignoreFocusOut: true }
+          );
+
+          if (modelsToImport && modelsToImport.length > 0) {
+              const labelsToImport = modelsToImport.map(item => item.label);
+              handler.availableModels = [...currentAvailable, ...labelsToImport];
+              importedCount = modelsToImport.length;
+          } else {
+              vscode.window.showInformationMessage("No models selected for import.");
+          }
+      }
+
+      if (importedCount > 0) {
+          vscode.window.showInformationMessage(`Imported ${importedCount} model(s) from Ollama.`);
+      }
+  });
 }
 
 /**
- * Open the manager panel
- * @param {interface} context 
- * @param {object} handler 
- * @param {interface} chatPanel 
- * @returns 
- */
-export function openModelManagerPanel(
-  context: vscode.ExtensionContext,
-  handler: ModelHandler,
-  chatPanel: vscode.WebviewPanel | undefined
-): void {
-  if (handler.modelMenu) {
-    handler.modelMenu.reveal(vscode.ViewColumn.Beside);
-    handler.setupManagerPanelDisposal(chatPanel);
-    handler.updateWebviews(handler.selectedModelName);
-    return;
-  }
-
-  handler.modelMenu = vscode.window.createWebviewPanel(
-    "ollamateModelManager",
-    "Model Manager",
-    vscode.ViewColumn.Beside,
-    {
-      enableScripts: true,
-      // Keep context when hidden? Maybe not necessary for manager.
-      // retainContextWhenHidden: true,
-      // Add local resource roots if loading local CSS/JS
-      // localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')]
-    }
-  );
-
-  handler.setupManagerPanelDisposal(chatPanel);
-
-  handler.modelMenu.webview.html = getManagerViewContent(); // Assuming this exists
-
-  handler.modelMenu.webview.onDidReceiveMessage(
-    (msg) => handleModelMenuMessage(msg, context, handler, chatPanel),
-    undefined,
-    context.subscriptions
-  );
-
-  handler.updateWebviews(handler.selectedModelName);
-}
-
-/**
- * Function to prompt user for model selection
- * @param {interface} context 
- * @param {interface} panelToUpdate 
- * @returns 
+ * Prompts user to select a model from the available list.
+ * Returns the selected model name or undefined if cancelled.
+ * @export
+ * @param {vscode.ExtensionContext} context
+ * @param {ModelHandler} handler
+ * @param {string} [promptTitle="Select a Model"]
+ * @return {*}  {(Promise<string | undefined>)}
  */
 export async function promptForModelSelection(
   context: vscode.ExtensionContext,
-  panelToUpdate?: vscode.WebviewPanel
+  handler: ModelHandler,
+  promptTitle: string = "Select a Model"
 ): Promise<string | undefined> {
-  const handler = new ModelHandler(context);
   const models = handler.availableModels;
   const currentSelection = handler.selectedModelName;
 
   if (models.length === 0) {
     vscode.window.showWarningMessage(
-      "No models available. Please add or import models using the Manager."
+      "No models available. Use the Manager to add or import models."
     );
     return undefined;
   }
 
-  const options = models.map((name) => ({
+  const options: vscode.QuickPickItem[] = models.map((name) => ({
     label: name,
-    description: name === currentSelection ? "(current)" : undefined,
+    description: name === currentSelection ? "$(check) current" : undefined,
   }));
 
   const result = await vscode.window.showQuickPick(options, {
-    title: "Select a Model",
-    placeHolder: "Choose a model to use for chat",
+    title: promptTitle,
+    placeHolder: "Choose a model",
+    ignoreFocusOut: true,
+    matchOnDescription: true,
   });
-
-  if (result?.label && panelToUpdate) {
-    panelToUpdate.webview.postMessage({
-      command: "updateModel",
-      model: result.label,
-    });
-  } else if (!result && panelToUpdate) {
-    panelToUpdate.webview.postMessage({
-      command: "updateModel",
-      model: currentSelection ?? "No Model Selected",
-    });
-  }
 
   return result?.label;
 }
