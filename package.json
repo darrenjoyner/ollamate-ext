@@ -12,13 +12,31 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "ollamate-ext.start",
-        "title": "Start Ollamate Extension"
-      }
-    ]
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "modelManagerViewContainer",
+          "title": "Ollamate Manager",
+          "icon": "$(hubot)"
+        }
+      ]
+    },
+    "views": {
+      "modelManagerViewContainer": [
+        {
+          "id": "modelManagerView",
+          "name": "Manage Models",
+          "type": "webview"
+        }
+      ]
+    }
   },
+  "commands": [
+    {
+      "command": "ollamate-ext.start",
+      "title": "Start Ollamate Extension"
+    }
+  ],
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
