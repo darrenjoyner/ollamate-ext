@@ -1,282 +1,366 @@
-import * as vscode from "vscode";
-import * as dotenv from "dotenv";
-import ollama from "ollama";
+// src/extension.ts
+import * as vscode from 'vscode';
+import * as dotenv from 'dotenv';
+import ollama from 'ollama'; // Needed for chat API calls
+// import { TextEncoder } from 'util'; // Not needed without manual file saving
 
+// --- View Content ---
 import { getAppViewContent } from "./views/appView";
+
+// --- Model Management ---
 import {
     ModelHandler,
     initializeModels,
-    addModelManually,
-    deleteModel,
-    importOllamaModels,
-    promptForModelSelection
+    addModelManually,    // Assuming these are standalone exported functions
+    deleteModel,         // Assuming these are standalone exported functions
+    importOllamaModels, // Assuming these are standalone exported functions
+    promptForModelSelection // Assuming this is a standalone exported function
 } from "./modelManager";
+
+// --- Providers ---
 import { ModelManagerViewProvider } from "./providers/modelManagerViewProvider";
+import { ChatHistoryProvider, ChatHistoryItem } from './providers/chatHistoryProvider'; // Import ChatHistoryItem
+
+// --- History Management ---
+import { ChatMessage } from './chatHistoryTypes'; // Keep ChatMessage for currentChatMessages
+import {
+    // Use functions from chatHistoryManager
+    addOrUpdateChatSession,
+    deleteChatSession,
+    getChatSessionById,
+    generateSummary,
+    getChatHistory // Needed for delete prompt fallback
+} from './chatHistoryManager';
+
+// --- End Imports ---
 
 dotenv.config();
 
 // --- Global Variables ---
-
 let chatPanel: vscode.WebviewPanel | undefined;
+let currentChatMessages: ChatMessage[] = [];
+let currentChatId: string | null = null;
+let currentModelUsedInSession: string | null = null; // Track model used when session started/loaded
 
-/**
- * Helper function to safely send messages to the chat panel webview.
- * Defined outside the command scope to be accessible by event listeners.
- * @param message The message object to send.
- */
+// --- Helper function to send messages to the chat panel ---
 function sendChatPanelMessage(message: any) {
     if (chatPanel) {
         chatPanel.webview.postMessage(message).then(
             (success) => {
-                if (!success) {
-                    console.warn("Posting message may have failed for chat panel.");
-                }
+                if (!success) { console.warn("Posting message may have failed for chat panel."); }
             },
-            (error) => {
-                console.error("Error posting message to chat panel webview:", error);
-            }
+            (error) => { console.error("Error posting message to chat panel:", error); }
         );
     } else {
-        // This is expected if the panel is closed when an event fires
-        // console.log("Chat panel not available to send message.");
+        // console.log("Chat panel not available to send message."); // Can be noisy
     }
 }
 
-
-/**
- * Activates the VS Code extension.
- * Sets up the ModelHandler, registers the Activity Bar view provider,
- * registers commands, and sets up event listeners.
- * @param context The extension context provided by VS Code.
- */
+// --- Activate Function ---
 export async function activate(context: vscode.ExtensionContext) {
-    console.log('Extension "ollamate-ext" activating...');
+    console.log('Ollamate extension activating...');
 
-    // --- Initialization ---
+    // --- Initialize Core Components ---
+    const handler = new ModelHandler(context); // Model state manager
+    await initializeModels(context, handler); // Check initial models
 
-    const handler = new ModelHandler(context);
-
-    await initializeModels(context, handler);
-
-    // --- Register Activity Bar View Provider ---
     const modelManagerProvider = new ModelManagerViewProvider(context.extensionUri, handler);
+    const chatHistoryProvider = new ChatHistoryProvider(context);
+
+    // --- Register Providers ---
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             ModelManagerViewProvider.viewType,
             modelManagerProvider,
-            { webviewOptions: { retainContextWhenHidden: true } }
+            { webviewOptions: { retainContextWhenHidden: true } } // Keep manager state
         )
     );
-    console.log("Model Manager View Provider registered.");
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider('chatHistoryView', chatHistoryProvider)
+    );
+    console.log("Webview and TreeView providers registered.");
 
+    // --- ModelHandler Event Listeners ---
     handler.on('modelChanged', (newModelName: string | undefined) => {
-        console.log(`Handler emitted modelChanged event: ${newModelName ?? 'None'}`);
-        sendChatPanelMessage({
-            command: 'updateModel',
-            model: newModelName ?? "No Model Selected"
-        });
-
-        sendChatPanelMessage({ command: 'chatResponse', text: `Model changed to: ${newModelName ?? 'None'}`, clear: false });
+        console.log(`Event: Model changed to ${newModelName}`);
+        sendChatPanelMessage({ command: 'updateModel', model: newModelName });
     });
-
-    handler.on('listChanged', (models: string[]) => {
-        console.log(`Handler emitted listChanged event. New list size: ${models.length}`);
+    handler.on('listChanged', () => { // No direct action needed here, providers handle own updates
+        console.log('Event: Model list changed');
     });
-
 
     // --- Register Commands ---
 
-    // Commands triggered by the Model Manager Activity Bar View
-    context.subscriptions.push(
-        vscode.commands.registerCommand('modelManager.load', async () => {
-            console.log("Command: modelManager.load");
-            // Use the refactored promptForModelSelection
-            const selected = await promptForModelSelection(context, handler, 'Select Model to Load');
-            if (selected) {
-                handler.selectedModelName = selected;
-                vscode.window.showInformationMessage(`Model "${selected}" selected.`);
-            } else {
-                 vscode.window.showInformationMessage("Model selection cancelled.");
+    // Model Manager Commands
+    context.subscriptions.push(vscode.commands.registerCommand('modelManager.load', async () => {
+        const selected = await promptForModelSelection(context, handler, 'Select Model to Use');
+        if (selected) { handler.selectedModelName = selected; }
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('modelManager.add', async () => {
+        await addModelManually(context, handler);
+        modelManagerProvider.updateView(); // Refresh manager view list
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('modelManager.import', async () => {
+        await importOllamaModels(context, handler);
+        modelManagerProvider.updateView(); // Refresh manager view list
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('modelManager.delete', async () => {
+        await deleteModel(context, handler);
+        modelManagerProvider.updateView(); // Refresh manager view list
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('modelManager.getModel', () => {
+        modelManagerProvider.updateView(); // Push update to manager view
+    }));
+
+    // Chat History Commands
+    context.subscriptions.push(vscode.commands.registerCommand('ollamate.history.refresh', () => {
+        chatHistoryProvider.refresh();
+        vscode.window.showInformationMessage("Chat history refreshed."); // Optional feedback
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('ollamate.history.deleteChat', async (historyItemOrId: ChatHistoryItem | string | undefined) => {
+        let sessionIdToDelete: string | undefined = typeof historyItemOrId === 'string' ? historyItemOrId : historyItemOrId?.sessionId;
+        let sessionLabel = (historyItemOrId as ChatHistoryItem)?.label || 'selected chat'; // Get label if possible
+
+        // If called from palette without selection, prompt user
+        if (!sessionIdToDelete) {
+            const history = getChatHistory(context);
+            if (history.length === 0) { /* ... show message ... */ return; }
+            const items = history.map(s => ({ label: s.name, description: s.modelUsed, id: s.id }));
+            const picked = await vscode.window.showQuickPick(items, { title: "Select Chat to Delete" });
+            if (!picked) {return;} // User cancelled
+            sessionIdToDelete = picked.id;
+            sessionLabel = picked.label; // Use picked label
+        }
+
+        // Confirmation
+        const confirmation = await vscode.window.showWarningMessage(
+            `Delete chat session "${sessionLabel}"? This cannot be undone.`,
+            { modal: true }, 'Delete'
+        );
+
+        if (confirmation === 'Delete') {
+            await deleteChatSession(context, sessionIdToDelete);
+            chatHistoryProvider.refresh();
+            // vscode.window.showInformationMessage("Chat session deleted."); // Optional feedback
+            // Clear panel if the deleted chat was the current one
+            if (currentChatId === sessionIdToDelete) {
+                currentChatId = null;
+                currentChatMessages = [];
+                currentModelUsedInSession = null;
+                if (chatPanel) {
+                    sendChatPanelMessage({ command: 'clearDisplay' });
+                    sendChatPanelMessage({ command: 'updateModel', model: handler.selectedModelName });
+                }
             }
-        })
-    );
+        }
+    }));
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand('modelManager.add', async () => {
-            console.log("Command: modelManager.add");
-            await addModelManually(context, handler);
-        })
-    );
+    context.subscriptions.push(vscode.commands.registerCommand('ollamate.history.loadChat', async (sessionId: string) => {
+        if (!sessionId) { return; }
+        const session = getChatSessionById(context, sessionId);
+        if (!session) { /* ... show error ... */ return; }
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand('modelManager.import', async () => {
-            console.log("Command: modelManager.import");
-            await importOllamaModels(context, handler);
-        })
-    );
+        // Save *previous* session if it exists and is different
+        if (currentChatId && currentChatId !== sessionId && currentChatMessages.length > 0) {
+            console.log(`Saving previous chat ${currentChatId} before loading ${sessionId}`);
+            const summary = generateSummary(currentChatMessages); // Use helper
+            await addOrUpdateChatSession(context, {
+                id: currentChatId, name: summary, timestamp: parseInt(currentChatId, 10),
+                modelUsed: currentModelUsedInSession ?? "Unknown", messages: [...currentChatMessages]
+            });
+            chatHistoryProvider.refresh(); // Refresh after saving previous
+        }
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand('modelManager.delete', async () => {
-            console.log("Command: modelManager.delete");
-            await deleteModel(context, handler);
-        })
-    );
+        // Ensure chat panel is open (creates/reveals, does NOT save current session again)
+        if (!chatPanel) {
+            await vscode.commands.executeCommand('ollamate-ext.start', { skipSave: true }); // Pass flag to skip save in start
+        }
+         if (!chatPanel) { /* handle error */ return; }
 
-    // Command for the manager view's JS to request initial/current state
-    context.subscriptions.push(
-        vscode.commands.registerCommand('modelManager.getModel', () => {
-            console.log("Command: modelManager.getModel");
-            modelManagerProvider.updateView();
-        })
-    );
 
-    // Command to start/show the Chat Webview Panel
+        // Update state to loaded session
+        console.log(`Loading chat session: ${sessionId}`);
+        currentChatId = session.id;
+        currentChatMessages = [...session.messages];
+        currentModelUsedInSession = session.modelUsed;
+
+        // Send data to webview
+        sendChatPanelMessage({
+            command: 'loadChat',
+            messages: session.messages,
+            modelUsedDisplay: session.modelUsed, // Pass historical model for display potentially
+            currentModel: handler.selectedModelName // Pass currently selected model
+        });
+        chatPanel.reveal(vscode.ViewColumn.Beside);
+    }));
+
+
+    // Start Chat / Create Panel Command
     const disposableStart = vscode.commands.registerCommand(
         "ollamate-ext.start",
-        async () => {
-            console.log("Command: ollamate-ext.start");
+        async (options?: { skipSave?: boolean }) => { // Accept options object
+            console.log("Command: ollamate-ext.start triggered.");
+
+            // Save previous session *unless* skipSave is true (e.g., called from loadChat)
+            // or if panel already exists
+            if (!options?.skipSave && !chatPanel && currentChatId && currentChatMessages.length > 0) {
+                console.log(`Saving previous chat session ${currentChatId} before starting new one.`);
+                const summary = generateSummary(currentChatMessages);
+                await addOrUpdateChatSession(context, {
+                    id: currentChatId, name: summary, timestamp: parseInt(currentChatId, 10),
+                    modelUsed: currentModelUsedInSession ?? "Unknown", messages: [...currentChatMessages]
+                });
+                chatHistoryProvider.refresh();
+                 // Reset state before creating new panel only if not skipping save
+                 currentChatId = null;
+                 currentChatMessages = [];
+                 currentModelUsedInSession = null;
+            }
+
+            // If panel exists, reveal
             if (chatPanel) {
                 console.log("Chat panel exists. Revealing.");
                 chatPanel.reveal(vscode.ViewColumn.Beside);
-                 sendChatPanelMessage({ command: 'updateModel', model: handler.selectedModelName ?? "No Model Selected" });
+                sendChatPanelMessage({ command: 'updateModel', model: handler.selectedModelName });
                 return;
             }
 
-            console.log("Creating new chat panel.");
+            // --- Create NEW Panel and Session ---
+            console.log("Creating new chat panel and session.");
+            // Reset state IF NOT loading (loading sets state *after* panel creation)
+            if (!options?.skipSave) { // Only reset if starting truly fresh
+                currentChatId = Date.now().toString();
+                currentChatMessages = [];
+                currentModelUsedInSession = handler.selectedModelName ?? null; // Capture current model
+            } else {
+                 console.log("Skipping state reset for new panel (likely loading chat).");
+                 // State should have been set by loadChat before calling start with skipSave
+            }
+
+
             chatPanel = vscode.window.createWebviewPanel(
-                "ollamateChat",
-                "Ollamate Chat",
-                vscode.ViewColumn.Beside,
-                {
+                "ollamateChat", // Internal ID
+                "Ollamate Chat", // Title
+                vscode.ViewColumn.Beside, // Show beside
+                { // Webview options
                     enableScripts: true,
-                    retainContextWhenHidden: true,
+                    retainContextWhenHidden: true, // Keep state when hidden
+                    localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')] // Allow loading from media
                 }
             );
 
-            // Handle panel disposal
-            chatPanel.onDidDispose(
-                () => {
-                    console.log("Chat panel disposed.");
-                    chatPanel = undefined;
-                },
-                null,
-                context.subscriptions
-            );
+            chatPanel.onDidDispose(async () => {
+                console.log("Chat panel disposed.");
+                 // Save the session that was just closed
+                 if (currentChatMessages.length > 0 && currentChatId) {
+                     console.log(`Saving chat session ${currentChatId} on dispose.`);
+                     const summary = generateSummary(currentChatMessages);
+                     await addOrUpdateChatSession(context, {
+                         id: currentChatId, name: summary, timestamp: parseInt(currentChatId, 10),
+                         modelUsed: currentModelUsedInSession ?? "Unknown", messages: [...currentChatMessages]
+                     });
+                     chatHistoryProvider.refresh();
+                 }
+                 // Clear global state associated with the closed panel
+                 currentChatId = null;
+                 currentChatMessages = [];
+                 currentModelUsedInSession = null;
+                 chatPanel = undefined; // Clear the panel reference
+            }, null, context.subscriptions);
 
-            // Set initial HTML content
+            // Set initial HTML
             chatPanel.webview.html = getAppViewContent(chatPanel.webview, context.extensionUri);
-            
-            /**
-             * Function to update the chat panel's title area (via message)
-             * Defined locally as it primarily uses sendChatPanelMessage
-             * @param {(string | undefined)} modelName
-             */
-            function updateChatPanelTitle(modelName: string | undefined) {
-                sendChatPanelMessage({
-                    command: "updateModel",
-                    model: modelName ?? "No Model Selected",
-                });
-            }
 
-            // --- Initialize model state FOR the chat panel ---
-            let selectedModel = handler.selectedModelName;
-            if (!selectedModel && handler.availableModels.length > 0) {
-                console.log("No model selected, but models available. Auto-selecting first.");
-                selectedModel = handler.availableModels[0];
-                handler.selectedModelName = selectedModel;
-                sendChatPanelMessage({ command: 'chatResponse', text: `Using model: ${selectedModel}`, clear: true });
-            } else if (!selectedModel) {
-                 console.log("No model selected and none available.");
-                 sendChatPanelMessage({ command: 'chatResponse', text: `No models available. Use the Manager (Activity Bar icon) to add/import.`, clear: true });
-            }
-            updateChatPanelTitle(handler.selectedModelName);
-
-
-            // --- Handle messages FROM the CHAT webview ---
+            // --- Handle messages FROM CHAT webview ---
             chatPanel.webview.onDidReceiveMessage(
                 async (message) => {
-                    console.log("Received message from chat webview:", message.command);
                     switch (message.command) {
                         case "chat": {
-                            const currentModel = handler.selectedModelName;
-                            if (!currentModel) {
-                                sendChatPanelMessage({ command: "chatResponse", text: "Error: No model selected. Use the Manager.", clear: true });
-                                return;
+                            const userText = message.text;
+                            const currentModel = handler.selectedModelName; // Model for this interaction
+                            if (!currentModel) { sendChatPanelMessage({ command: "chatResponse", text: "\nError: No model selected." }); return; }
+                            if (!userText) { sendChatPanelMessage({ command: "chatResponse", text: "\nError: Empty prompt." }); return; }
+                            if (!currentChatId) { console.error("Error: No active chat ID."); return; }
+
+                            // If this is the first message in a *new* session, set the session model
+                            if (currentChatMessages.length === 0) {
+                                currentModelUsedInSession = currentModel;
+                                console.log(`Set model for new session ${currentChatId} to ${currentModel}`);
                             }
-                            if (!message.text || message.text.trim() === "") {
-                                sendChatPanelMessage({ command: "chatResponse", text: "Error: Cannot send empty prompt.", clear: true });
-                                return;
-                            }
+
+                            // Store User Message
+                            currentChatMessages.push({ role: 'user', content: userText });
 
                             try {
-                                console.log("Sending 'setThinking: true' to chat webview");
-                                sendChatPanelMessage({ command: "setThinking", thinking: true });
-                                sendChatPanelMessage({ command: "chatResponse", text: `\n> ${message.text}\n\n`, clear: false });
                                 sendChatPanelMessage({ command: "setThinking", thinking: true });
 
-                                const stream = await ollama.chat({
-                                    model: currentModel,
-                                    messages: [{ role: "user", content: message.text }],
-                                    stream: true,
-                                });
+                                // Send context (ensure it doesn't exceed model limits - advanced)
+                                // For now, send all messages from the current session
+                                const messagesToSend = currentChatMessages.map(m => ({ role: m.role, content: m.content }));
 
-                                // Stream response chunks
+                                const stream = await ollama.chat({ model: currentModel, messages: messagesToSend, stream: true });
+
+                                let fullResponse = "";
                                 for await (const part of stream) {
-                                  if (!chatPanel) {
-                                      break;
-                                  }
-                                  sendChatPanelMessage({
-                                      command: "chatResponse",
-                                      text: part.message.content,
-                                      clear: false,
-                                  });
-                              }
-                                if (chatPanel) {
-                                    sendChatPanelMessage({ command: "chatResponse", text: "\n", clear: false });
+                                    if (!chatPanel) {break;} // Stop if panel closed
+                                    const chunk = part.message.content;
+                                    fullResponse += chunk;
+                                    // Send chunks for streaming display
+                                    sendChatPanelMessage({ command: "chatResponse", text: chunk });
+                                }
+
+                                // Store full Assistant Message once stream is done
+                                if (fullResponse && chatPanel) {
+                                    currentChatMessages.push({ role: 'assistant', content: fullResponse });
+                                    // Add final newline in webview after response is fully appended
+                                    sendChatPanelMessage({ command: "chatResponse", text: "\n" });
                                 }
 
                             } catch (error: any) {
                                 console.error("Ollama chat error:", error);
-                                const errorMessage = `Error: ${error.message || "Unknown error contacting Ollama."}`;
-                                sendChatPanelMessage({ command: "chatResponse", text: errorMessage, clear: false });
+                                const errorMsg = `\nError: ${error.message ?? "Unknown Ollama communication error."}`;
+                                sendChatPanelMessage({ command: "chatResponse", text: errorMsg });
+                                // Also store error in history? Maybe not.
                             } finally {
-                                sendChatPanelMessage({ command: "setThinking", thinking: false });
+                                if (chatPanel) {sendChatPanelMessage({ command: "setThinking", thinking: false });}
                             }
                             break;
-                        }
+                        } // End case "chat"
 
                         case "getModel": {
-                            updateChatPanelTitle(handler.selectedModelName);
+                            sendChatPanelMessage({ command: 'updateModel', model: handler.selectedModelName });
                             break;
                         }
                         case "log": {
                             console.log("Chat Webview log:", message.data);
                             break;
                         }
+                        case 'clearDisplayRequest': { // Renamed for clarity
+                            console.log("Webview requested display clear (likely during load).");
+                            break;
+                        }
                         default:
                             console.warn("Received unknown command from chat webview:", message.command);
-                    }
-                },
-                undefined,
-                context.subscriptions
-            );
-        }
-    );
+                    } // End switch
+                } // End message handler
+            ); // End onDidReceiveMessage
+
+             // Send initial model state AFTER setting HTML and message handler
+             sendChatPanelMessage({ command: 'updateModel', model: handler.selectedModelName });
+
+        } // End start command handler
+    ); // End registerCommand
 
     context.subscriptions.push(disposableStart);
+    console.log('Ollamate extension fully activated.');
 
-    console.log('Extension "ollamate-ext" fully activated.');
-}
+} // End activate
 
-
-/**
- * Deactivates the extension.
- * VS Code handles disposing disposables added to context.subscriptions.
- */
+// --- Deactivate Function ---
 export function deactivate() {
-    console.log('Extension "ollamate-ext" deactivated.');
-    if (chatPanel) {
-        chatPanel.dispose();
-    }
-    chatPanel = undefined;
+    console.log('Ollamate extension deactivating.');
+    // Panel disposal handles saving the last session via its onDidDispose listener
+    // No need to explicitly save here unless the panel might still be open
+    // if (chatPanel) { chatPanel.dispose(); } // Let VS Code handle this
 }

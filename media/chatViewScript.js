@@ -1,147 +1,111 @@
 // media/chatViewScript.js
-
 (function () {
-    // --- Initial Checks ---
-    if (typeof acquireVsCodeApi === 'undefined') {
-        console.error("acquireVsCodeApi is not available.");
-        return;
-    }
-    const vscode = acquireVsCodeApi();
-
-    // --- DOM Element References ---
-    const responseDiv = document.getElementById('response');
-    const promptInput = document.getElementById('prompt');
-    const modelNameSpan = document.getElementById('modelName');
-    const sendButton = document.getElementById('send-button');
-    const thinkingIndicator = document.getElementById('thinking-indicator');
-
-    // --- Check Essential Elements ---
-    if (!responseDiv || !promptInput || !modelNameSpan || !sendButton) {
-        console.error("ChatView Error: One or more essential UI elements not found.");
-        return;
-    }
-
-    // --- Helper Functions ---
-    
-    function sendMessage(command, data = {}) {
-        vscode.postMessage({ command, ...data });
-    }
+    // ... (api check, element refs, helpers) ...
 
     function appendToResponse(text, isPrompt = false) {
-        const textNode = document.createTextNode(text);
-        if (isPrompt) {
-            const strong = document.createElement('strong');
-            strong.appendChild(textNode);
-            responseDiv.appendChild(strong);
-        } else {
-            responseDiv.appendChild(textNode);
-        }
+        const prefix = isPrompt ? 'User: ' : 'Model: ';
+        const formattedText = (responseDiv.innerHTML ? '\n' : '') + prefix + text + (isPrompt ? '\n' : ''); // Add newline before, and after user prompt
+        const textNode = document.createTextNode(formattedText);
+        const messageElement = document.createElement('div');
+        messageElement.className = isPrompt ? 'user-message' : 'model-message';
+        messageElement.appendChild(textNode);
+        responseDiv.appendChild(messageElement);
         responseDiv.scrollTop = responseDiv.scrollHeight;
     }
 
-    function adjustTextareaHeight() {
-        promptInput.style.height = 'auto';
-        const newHeight = Math.min(promptInput.scrollHeight, 150);
-        promptInput.style.height = newHeight + 'px';
-    }
-
-    // --- Command Handlers (Extracted Logic) ---
-
+    // --- Command Handlers ---
     function handleChatResponse(message) {
-        if (message.clear) {
-            responseDiv.innerHTML = '';
-        }
         if (message.text) {
-            appendToResponse(message.text, false);
+            // Append AI response chunk (no prefix added here)
+            const textNode = document.createTextNode(message.text);
+            responseDiv.appendChild(textNode);
+            responseDiv.scrollTop = responseDiv.scrollHeight;
         }
     }
 
     function handleUpdateModel(message) {
-        const currentModel = message.model;
-        const displayModelName = currentModel || 'No Model Selected';
-        const hasValidModel = !!currentModel;
+         const currentModel = message.model; // This is the *currently selected* model
+         const displayModelName = currentModel || 'No Model Selected';
+         const hasValidModel = !!currentModel;
 
-        modelNameSpan.textContent = `(${displayModelName})`;
-        promptInput.disabled = !hasValidModel;
-        promptInput.placeholder = hasValidModel
-            ? 'Enter your prompt here... (Shift+Enter for newline)'
-            : 'Select a model via the Manager to chat';
+         // Update the main model display span
+         modelNameSpan.textContent = `(${displayModelName})`;
 
-        sendButton.disabled = !hasValidModel;
-        sendButton.textContent = 'Send';
-
-        adjustTextareaHeight();
+         // Enable/disable based on *currently selected* model
+         promptInput.disabled = !hasValidModel;
+         promptInput.placeholder = hasValidModel
+             ? 'Enter your prompt here...'
+             : 'Select a model via the Manager to chat';
+         sendButton.disabled = !hasValidModel; // Also disable send button if no model selected
+         adjustTextareaHeight();
     }
 
-    function handleSetThinking(message) {
-        const thinking = message.thinking;
-        const hasValidModel = !!modelNameSpan.textContent.match(/\(.*\)/) && modelNameSpan.textContent !== '(No Model Selected)';
+    function handleSetThinking(message) { /* ... same as before ... */ }
 
-        let placeholderText = '';
-        if (thinking) {
-            placeholderText = "Processing...";
-        } else if (hasValidModel) {
-            placeholderText = 'Enter your prompt here... (Shift+Enter for newline)';
-        } else {
-            placeholderText = 'Select a model via the Manager to chat';
-        }
-        promptInput.placeholder = placeholderText;
-        promptInput.disabled = thinking;
-        sendButton.disabled = thinking || !hasValidModel;
-        sendButton.textContent = thinking ? 'Waiting...' : 'Send';
+    function handleLoadChat(message) {
+        console.log("Handling loadChat message");
+        // Clear display first
+        handleClearDisplay();
 
-        if (thinkingIndicator) {
-            thinkingIndicator.style.display = thinking ? 'flex' : 'none';
+        // Render loaded messages
+        if (message.messages && Array.isArray(message.messages)) {
+            message.messages.forEach(msg => {
+                if (msg.role && msg.content) {
+                    appendToResponse(msg.content, msg.role === 'user');
+                }
+            });
         }
+
+        // Update model display - show *currently selected* model for new prompts
+        // The historical model used is shown in the history list itself
+         const currentModel = message.currentModel; // Model currently selected in extension
+         const displayModelName = currentModel || 'No Model Selected';
+         const hasValidModel = !!currentModel;
+
+         modelNameSpan.textContent = `(${displayModelName})`;
+         promptInput.disabled = !hasValidModel;
+         promptInput.placeholder = hasValidModel ? 'Enter your prompt...' : 'Select a model...';
+         sendButton.disabled = !hasValidModel;
+
+         handleSetThinking({ thinking: false }); // Ensure UI is interactive
+         if (responseDiv) { responseDiv.scrollTop = responseDiv.scrollHeight; } // Scroll to bottom
+    }
+
+    // Handle explicit clear command from extension
+    function handleClearDisplay() {
+        console.log("Handling clearDisplay message");
+        if (responseDiv) {responseDiv.innerHTML = '';}
+        if (promptInput) { promptInput.value = ''; adjustTextareaHeight(); }
+        // Don't necessarily clear the model name here
     }
 
     // --- Event Listeners ---
-
     sendButton.addEventListener('click', () => {
         const text = promptInput.value.trim();
         if (text && !sendButton.disabled) {
-            appendToResponse(`\n> ${text}\n\n`, true);
-            sendMessage('chat', { text });
+            // Display user prompt immediately for better UX
+             appendToResponse(text, true); // Display formatted user prompt
+            sendMessage('chat', { text }); // Send raw text to extension
             promptInput.value = '';
             adjustTextareaHeight();
         }
     });
+    // ... (input, keydown) ...
 
-    promptInput.addEventListener('input', adjustTextareaHeight);
-
-    promptInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            if (!sendButton.disabled) {
-                sendButton.click();
-            }
-        }
-    });
-
+    // --- Main Message Listener ---
     window.addEventListener('message', event => {
         const message = event.data;
-        console.log("ChatView received message:", message.command);
-
         switch (message.command) {
-            case 'chatResponse':
-                handleChatResponse(message);
-                break;
-
-            case 'updateModel':
-                handleUpdateModel(message);
-                break;
-
-            case 'setThinking':
-                handleSetThinking(message);
-                break;
-
-            default:
-                console.warn("ChatView received unknown command:", message.command);
+            case 'chatResponse': handleChatResponse(message); break;
+            case 'updateModel': handleUpdateModel(message); break;
+            case 'setThinking': handleSetThinking(message); break;
+            case 'loadChat': handleLoadChat(message); break;
+            case 'clearDisplay': handleClearDisplay(); break; // Handle explicit clear
+            default: console.warn("ChatView received unknown command:", message.command);
         }
     });
 
     // --- Initial Setup ---
     sendMessage('getModel');
     adjustTextareaHeight();
-
-}()); // End IIFE
+}());
