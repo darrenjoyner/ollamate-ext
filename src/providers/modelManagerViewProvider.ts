@@ -4,6 +4,14 @@ import * as vscode from 'vscode';
 import { ModelHandler } from '../modelManager';
 import { getManagerViewContent } from '../views/managerView';
 
+
+/**
+ *
+ *
+ * @export
+ * @class ModelManagerViewProvider
+ * @implements {vscode.WebviewViewProvider}
+ */
 export class ModelManagerViewProvider implements vscode.WebviewViewProvider {
 
     public static readonly viewType = 'modelManagerView';

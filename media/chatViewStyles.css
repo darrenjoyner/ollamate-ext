@@ -87,27 +87,8 @@ button:disabled {
     padding: 5px 10px;
     color: var(--vscode-descriptionForeground);
     font-style: italic;
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
     margin-top: 0.5em;
 }
-
-/* Simple CSS Spinner */
-.spinner {
-    border: 2px solid var(--vscode-editorWidget-border);
-    border-top: 2px solid var(--vscode-button-background);
-    border-radius: 50%;
-    width: 1em;
-    height: 1em;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
 
 /* Prompt Input Area */
 .prompt-area {

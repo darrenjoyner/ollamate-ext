@@ -1,6 +1,12 @@
 // src/views/appView.ts
 import * as vscode from 'vscode';
 
+
+/**
+ *
+ *
+ * @return {*} 
+ */
 function getNonce() {
     let text = '';
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -10,6 +16,15 @@ function getNonce() {
     return text;
 }
 
+
+/**
+ *
+ *
+ * @export
+ * @param {vscode.Webview} webview
+ * @param {vscode.Uri} extensionUri
+ * @return {*}  {string}
+ */
 export function getAppViewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
     const nonce = getNonce();
 
@@ -29,16 +44,18 @@ export function getAppViewContent(webview: vscode.Webview, extensionUri: vscode.
             <!-- Strict Content-Security-Policy -->
             <meta http-equiv="Content-Security-Policy" content="
                 default-src 'none';
-                style-src ${webview.cspSource}; 
-                script-src 'nonce-${nonce}'; 
+                style-src ${webview.cspSource} 'unsafe-inline';
+                style-src-elem ${webview.cspSource};
+                script-src 'nonce-${nonce}';
                 img-src ${webview.cspSource} https: data:;
                 font-src ${webview.cspSource};
-                connect-src ${webview.cspSource}; 
+                connect-src ${webview.cspSource};
             ">
 
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             
             <!-- Link external stylesheet -->
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <link href="${styleUri}" rel="stylesheet"> 
             
             <title>Ollamate Chat</title> 
@@ -52,9 +69,6 @@ export function getAppViewContent(webview: vscode.Webview, extensionUri: vscode.
             <!-- Chat container -->
             <div id="chat-container" role="log" aria-live="polite">
                 <div id="response"></div>
-                <div id="thinking-indicator" style="display: none;" aria-label="Processing request">
-                    <div class="spinner"></div> Ready
-                 </div>
             </div>
     
             <!-- Prompt input area -->

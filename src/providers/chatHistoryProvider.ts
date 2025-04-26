@@ -4,8 +4,15 @@ import { getChatHistory } from '../chatHistoryManager';
 
 type ChatHistoryTreeDataType = ChatHistoryItem | undefined | null | void;
 
-export class ChatHistoryProvider implements vscode.TreeDataProvider<ChatHistoryItem> {
 
+/**
+ *
+ *
+ * @export
+ * @class ChatHistoryProvider
+ * @implements {vscode.TreeDataProvider<ChatHistoryItem>}
+ */
+export class ChatHistoryProvider implements vscode.TreeDataProvider<ChatHistoryItem> {
     private readonly _onDidChangeTreeData: vscode.EventEmitter<ChatHistoryTreeDataType> = new vscode.EventEmitter<ChatHistoryTreeDataType>();
     readonly onDidChangeTreeData: vscode.Event<ChatHistoryTreeDataType> = this._onDidChangeTreeData.event;
 
@@ -41,6 +48,14 @@ export class ChatHistoryProvider implements vscode.TreeDataProvider<ChatHistoryI
     }
 }
 
+
+/**
+ *
+ *
+ * @export
+ * @class ChatHistoryItem
+ * @extends {vscode.TreeItem}
+ */
 export class ChatHistoryItem extends vscode.TreeItem {
     constructor(
         public readonly label: string, // Summary
