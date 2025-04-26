@@ -24,12 +24,15 @@ export function getChatHistory(context: vscode.ExtensionContext): ChatSession[] 
  * @return {*}  {Promise<void>}
  */
 async function saveChatHistory(context: vscode.ExtensionContext, history: ChatSession[]): Promise<void> {
-    //TODO: Add this to settings
-    const MAX_HISTORY = 50; // Example limit
+    const config = vscode.workspace.getConfiguration('ollamate');
+
+    const maxHistory = config.get<number>('maxHistory', 50);
+
+    const limit = Math.max(1, maxHistory);
 
     const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
  
-    const limitedHistory = sortedHistory.slice(0, MAX_HISTORY);
+    const limitedHistory = sortedHistory.slice(0, limit);
  
     await context.globalState.update(HISTORY_KEY, limitedHistory);
     console.log(`Chat history saved/updated. Count: ${limitedHistory.length}`);
@@ -50,9 +53,9 @@ export async function addOrUpdateChatSession(context: vscode.ExtensionContext, s
     let history = getChatHistory(context);
     const index = history.findIndex(s => s.id === session.id);
     if (index !== -1) {
-        history[index] = session; // Update existing
+        history[index] = session;
     } else {
-        history.push(session); // Add new
+        history.push(session);
     }
     await saveChatHistory(context, history);
 }

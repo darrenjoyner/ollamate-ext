@@ -167,7 +167,6 @@ export async function deleteModel(
  */
 export async function listOllamaModels(): Promise<string[]> {
   try {
-    // TODO: Make URL configurable via settings
     const ollamaUrl = vscode.workspace.getConfiguration('ollamate').get<string>('ollamaApiUrl') ?? "http://localhost:11434";
     const response = await fetch(`${ollamaUrl}/api/tags`);
     if (!response.ok) {
