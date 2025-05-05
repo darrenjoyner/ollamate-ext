@@ -1,26 +1,34 @@
 // src/views/managerView.ts
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 function getNonce() {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
+	let text = "";
+	const possible =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+	for (let i = 0; i < 32; i++) {
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
 }
 
-export function getManagerViewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-    const nonce = getNonce();
+export function getManagerViewContent(
+	webview: vscode.Webview,
+	extensionUri: vscode.Uri
+): string {
+	const nonce = getNonce();
 
-    // --- Generate URIs for external files ---
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'managerStyles.css'));
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'managerScript.js'));
+	// --- Generate URIs for external files ---
+	const styleUri = webview.asWebviewUri(
+		vscode.Uri.joinPath(extensionUri, "media", "managerStyles.css")
+	);
+	const scriptUri = webview.asWebviewUri(
+		vscode.Uri.joinPath(extensionUri, "media", "managerScript.js")
+	);
 
-    console.log("Manager Style URI:", styleUri.toString());
-    console.log("Manager Script URI:", scriptUri.toString());
+	console.log("Manager Style URI:", styleUri.toString());
+	console.log("Manager Script URI:", scriptUri.toString());
 
-    return /*html*/ `
+	return /*html*/ `
         <!DOCTYPE html>
         <html lang="en">
         <head>

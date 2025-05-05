@@ -1,41 +1,44 @@
 // src/views/appView.ts
-import * as vscode from 'vscode';
-
+import * as vscode from "vscode";
 
 /**
- *
- *
- * @return {*} 
+ * Random string used in the Content Security Policy (CSP)
+ * @return {*}
  */
 function getNonce() {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
+	let text = "";
+	const possible =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+	for (let i = 0; i < 32; i++) {
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
 }
 
-
 /**
- *
- *
+ * Gets the App View Content
  * @export
  * @param {vscode.Webview} webview
  * @param {vscode.Uri} extensionUri
  * @return {*}  {string}
  */
-export function getAppViewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-    const nonce = getNonce();
+export function getAppViewContent(
+	webview: vscode.Webview,
+	extensionUri: vscode.Uri
+): string {
+	const nonce = getNonce();
 
+	const styleUri = webview.asWebviewUri(
+		vscode.Uri.joinPath(extensionUri, "media", "chatViewStyles.css")
+	);
+	const scriptUri = webview.asWebviewUri(
+		vscode.Uri.joinPath(extensionUri, "media", "chatViewScript.js")
+	);
 
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'chatViewStyles.css'));
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'chatViewScript.js'));
+	console.log("Style URI:", styleUri.toString());
+	console.log("Script URI:", scriptUri.toString());
 
-    console.log("Style URI:", styleUri.toString());
-    console.log("Script URI:", scriptUri.toString());
-
-    return /*html*/ `
+	return /*html*/ `
         <!DOCTYPE html>
         <html lang="en">
         <head>

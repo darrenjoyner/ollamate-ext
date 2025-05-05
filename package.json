@@ -13,12 +13,32 @@
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
-      "ollamate.maxHistory": {
+      "title": "Ollamate",
+      "properties": {
+        "ollamate.maxHistory": {
           "type": "number",
           "default": 50,
           "minimum": 1,
           "description": "Maximum number of recent chat sessions to store in the history view."
+        },
+        "ollamate.defaultModel": {
+          "type": "string",
+          "default": "",
+          "description": "Default model name (e.g., llama3:latest) to use for new chats if none is selected. Leave empty to use last selected or prompt."
+        },
+        "ollamate.defaultSystemPrompt": {
+          "type": "string",
+          "default": "",
+          "description": "Default system prompt prepended automatically to every new chat session.",
+          "format": "multi-line"
+        },
+        "ollamate.requestTimeout": {
+          "type": "number",
+          "default": 120000,
+          "minimum": 5000,
+          "description": "Timeout for Ollama API requests in milliseconds (e.g., 120000 for 2 minutes)."
         }
+      }
     },
     "viewsContainers": {
       "activitybar": [
