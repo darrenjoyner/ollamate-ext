@@ -1,0 +1,122 @@
+/* media/managerStyles.css */
+
+/* Style the body directly */
+body {
+  font-family: var(--vscode-font-family, sans-serif);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-editor-foreground);
+  background-color: var(
+    --vscode-sideBar-background,
+    var(--vscode-editor-background)
+  );
+  margin: 0;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.model-manager-view h2 {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: var(--vscode-sideBar-foreground);
+  flex-shrink: 0;
+}
+.model-manager-view .current-model {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+  flex-shrink: 0;
+}
+.model-manager-view #currentModelName {
+  font-weight: bold;
+  color: var(--vscode-list-highlightForeground);
+}
+.model-manager-view .button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-top: 1px solid var(--vscode-separator-foreground);
+  padding-top: 1rem;
+  margin-top: 1rem;
+  flex-shrink: 0;
+}
+.model-manager-view .button-group button {
+  padding: 0.6em 1em;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  outline: none;
+  font-size: var(--vscode-font-size);
+  font-family: var(--vscode-font-family);
+}
+.model-manager-view .button-group button:hover:not(:disabled) {
+  /* Add :not(:disabled) */
+  background-color: var(--vscode-button-hoverBackground);
+}
+/* Add disabled style */
+.model-manager-view .button-group button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.model-manager-view .button-group button#deleteBtn {
+  background-color: var(--vscode-errorForeground);
+  color: var(--vscode-button-foreground);
+  opacity: 0.9;
+  border-color: transparent;
+}
+.model-manager-view .button-group button#deleteBtn:hover:not(:disabled) {
+  /* Add :not(:disabled) */
+  opacity: 1;
+  background-color: var(--vscode-errorForeground);
+}
+
+/* Model list styles */
+.model-manager-view .model-list {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--vscode-sideBar-border, #ccc);
+  padding-top: 1rem;
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 50px;
+}
+.model-manager-view .model-list h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 0.95em;
+  color: var(--vscode-sideBar-foreground);
+}
+.model-manager-view .model-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.model-manager-view .model-list li {
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  margin-bottom: 0.2em;
+  cursor: default;
+  color: var(
+    --vscode-list-inactiveSelectionForeground,
+    var(--vscode-foreground)
+  );
+  background-color: transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-manager-view .model-list li.current {
+  font-weight: bold;
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}

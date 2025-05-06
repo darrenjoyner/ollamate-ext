@@ -1,7 +1,7 @@
 {
-  "name": "yester-ext",
-  "displayName": "Yester-ext",
-  "description": "A VS Code extension for interacting with local LLM models",
+  "name": "ollamate-ext",
+  "displayName": "Ollamate",
+  "description": "A VS Code extension for interacting with local LLM models via Ollama.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.96.0"
@@ -12,31 +12,139 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Ollamate",
+      "properties": {
+        "ollamate.maxHistory": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "description": "Maximum number of recent chat sessions to store in the history view."
+        },
+        "ollamate.defaultModel": {
+          "type": "string",
+          "default": "",
+          "description": "Default model name (e.g., llama3:latest) to use for new chats if none is selected. Leave empty to use last selected or prompt."
+        },
+        "ollamate.defaultSystemPrompt": {
+          "type": "string",
+          "default": "",
+          "description": "Default system prompt prepended automatically to every new chat session.",
+          "format": "multi-line"
+        },
+        "ollamate.requestTimeout": {
+          "type": "number",
+          "default": 120000,
+          "minimum": 5000,
+          "description": "Timeout for Ollama API requests in milliseconds (e.g., 120000 for 2 minutes)."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ollamateContainer",
+          "title": "Ollamate",
+          "icon": "$(hubot)"
+        }
+      ]
+    },
+    "views": {
+      "ollamateContainer": [
+        {
+          "id": "chatHistoryView",
+          "name": "Chat History",
+          "type": "tree",
+          "icon": "$(history)"
+        },
+        {
+          "id": "modelManagerView",
+          "name": "Model Manager",
+          "type": "webview",
+          "icon": "$(settings-gear)"
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "yester-ext.start",
-        "title": "Start Yester Extension"
+        "command": "ollamate-ext.start",
+        "title": "Ollamate: Start New Chat"
+      },
+      {
+        "command": "modelManager.load",
+        "title": "Ollamate: Select/Load Model"
+      },
+      {
+        "command": "modelManager.add",
+        "title": "Ollamate: Add Model Manually"
+      },
+      {
+        "command": "modelManager.import",
+        "title": "Ollamate: Import Models from Ollama"
+      },
+      {
+        "command": "modelManager.delete",
+        "title": "Ollamate: Delete Model from List"
+      },
+      {
+        "command": "modelManager.getModel",
+        "title": "Ollamate: Get Current Model"
+      },
+      {
+        "command": "ollamate.history.loadChat",
+        "title": "Load Chat"
+      },
+      {
+        "command": "ollamate.history.deleteChat",
+        "title": "Delete Chat",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "ollamate.history.refresh",
+        "title": "Refresh History",
+        "icon": "$(refresh)"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "ollamate.history.refresh",
+          "when": "view == chatHistoryView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ollamate.history.loadChat",
+          "when": "view == chatHistoryView && viewItem == chatHistoryItem",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ollamate.history.deleteChat",
+          "when": "view == chatHistoryView && viewItem == chatHistoryItem",
+          "group": "navigation@2"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
+    "lint": "eslint src --fix",
     "test": "vscode-test"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "@types/vscode": "^1.96.0",
+    "@types/vscode": "^1.99.0",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "eslint": "^9.16.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.3"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

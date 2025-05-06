@@ -1,6 +1,6 @@
-# Yester VS Code Extension
+# Ollamate VS Code Extension
 
-Yester is a Visual Studio Code extension that integrates with local machine learning models using the Ollama API. It allows you to interact with large language models (LLMs) directly from within VS Code through a simple chat interface.
+Ollamate is a Visual Studio Code extension that integrates with local machine learning models using the Ollama API. It allows you to interact with large language models (LLMs) directly from within VS Code through a simple chat interface.
 
 ## Features
 
@@ -14,7 +14,7 @@ Yester is a Visual Studio Code extension that integrates with local machine lear
 1. Ensure that you have [Node.js](https://nodejs.org/) and [Visual Studio Code](https://code.visualstudio.com/) installed.
 2. Clone this repository to your local machine:
    ```bash
-   git clone https://github.com/yourusername/yester-vscode-extension.git
+   git clone https://github.com/yourusername/ollamate-vscode-extension.git
    ```
 3. Install the necessary dependencies:
    ```bash
@@ -29,15 +29,9 @@ Yester is a Visual Studio Code extension that integrates with local machine lear
 ## Usage
 
 1. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS) to open the command palette.
-2. Type `Yester: Start` and select the command to activate the chat interface.
+2. Type `ollamate: Start` and select the command to activate the chat interface.
 3. Select a model from the list of available models.
 4. Start typing your prompt in the text box and click "Ask" to get a response from the model.
-
-## Available Models
-
-- `deepseek-r1:14b`
-- `deepseek-r1:32b`
-- `deepseek-r1:70b`
 
 (You can easily add more models to the `availableModels` array in the code.)
 
