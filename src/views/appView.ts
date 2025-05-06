@@ -1,26 +1,44 @@
 // src/views/appView.ts
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
+/**
+ * Random string used in the Content Security Policy (CSP)
+ * @return {*}
+ */
 function getNonce() {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
+	let text = "";
+	const possible =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+	for (let i = 0; i < 32; i++) {
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
 }
 
-export function getAppViewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-    const nonce = getNonce();
+/**
+ * Gets the App View Content
+ * @export
+ * @param {vscode.Webview} webview
+ * @param {vscode.Uri} extensionUri
+ * @return {*}  {string}
+ */
+export function getAppViewContent(
+	webview: vscode.Webview,
+	extensionUri: vscode.Uri
+): string {
+	const nonce = getNonce();
 
+	const styleUri = webview.asWebviewUri(
+		vscode.Uri.joinPath(extensionUri, "media", "chatViewStyles.css")
+	);
+	const scriptUri = webview.asWebviewUri(
+		vscode.Uri.joinPath(extensionUri, "media", "chatViewScript.js")
+	);
 
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'chatViewStyles.css'));
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', 'chatViewScript.js'));
+	console.log("Style URI:", styleUri.toString());
+	console.log("Script URI:", scriptUri.toString());
 
-    console.log("Style URI:", styleUri.toString());
-    console.log("Script URI:", scriptUri.toString());
-
-    return /*html*/ `
+	return /*html*/ `
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -29,16 +47,18 @@ export function getAppViewContent(webview: vscode.Webview, extensionUri: vscode.
             <!-- Strict Content-Security-Policy -->
             <meta http-equiv="Content-Security-Policy" content="
                 default-src 'none';
-                style-src ${webview.cspSource}; 
-                script-src 'nonce-${nonce}'; 
+                style-src ${webview.cspSource} 'unsafe-inline';
+                style-src-elem ${webview.cspSource};
+                script-src 'nonce-${nonce}';
                 img-src ${webview.cspSource} https: data:;
                 font-src ${webview.cspSource};
-                connect-src ${webview.cspSource}; 
+                connect-src ${webview.cspSource};
             ">
 
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             
             <!-- Link external stylesheet -->
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <link href="${styleUri}" rel="stylesheet"> 
             
             <title>Ollamate Chat</title> 
@@ -52,9 +72,6 @@ export function getAppViewContent(webview: vscode.Webview, extensionUri: vscode.
             <!-- Chat container -->
             <div id="chat-container" role="log" aria-live="polite">
                 <div id="response"></div>
-                <div id="thinking-indicator" style="display: none;" aria-label="Processing request">
-                    <div class="spinner"></div> Ready
-                 </div>
             </div>
     
             <!-- Prompt input area -->
