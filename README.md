@@ -6,7 +6,7 @@
 
 Bring the power of local Large Language Models directly into your Visual Studio Code workflow with Ollamate! Interact seamlessly with models running via [Ollama](https://ollama.com/) without leaving your editor.
 
-![Ollamate Extension Showcase](assets\ollamateScreenshot.PNG)
+![Ollamate Extension Showcase](assets/ollamateScreenshot.PNG)
 
 ## Features
 
