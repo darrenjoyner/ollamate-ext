@@ -1,8 +1,14 @@
 {
   "name": "ollamate-ext",
+  "publisher": "KairosynStudio",
   "displayName": "Ollamate",
   "description": "A VS Code extension for interacting with local LLM models via Ollama.",
   "version": "0.0.1",
+  "icon": "assets\robotic_llama_128.png",
+  "galleryBanner": {
+    "color": "#3A6F80",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.96.0"
   },
