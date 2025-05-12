@@ -133,6 +133,10 @@
       ]
     }
   },
+  "repository": {
+    "type": "git",
+    "url": "https://https://github.com/darrenjoyner/ollamate-ext"
+  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
