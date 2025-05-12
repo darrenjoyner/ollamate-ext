@@ -13,7 +13,16 @@
     "vscode": "^1.99.0"
   },
   "categories": [
+    "Machine Learning",
+    "Chat",
     "Other"
+  ],
+  "keywords": [
+    "ollama",
+    "llm",
+    "ai",
+    "chat",
+    "local llm"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
@@ -135,7 +144,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://https://github.com/darrenjoyner/ollamate-ext"
+    "url": "https://github.com/darrenjoyner/ollamate-ext"
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
