@@ -1,13 +1,12 @@
 # Ollamate - Your Local LLM Copilot for VS Code
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/[YourPublisherName].ollamate-ext.svg?style=flat-square&label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=[YourPublisherName].ollamate-ext)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/[YourPublisherName].ollamate-ext.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=[YourPublisherName].ollamate-ext)
-[![Ratings](https://img.shields.io/visual-studio-marketplace/r/[YourPublisherName].ollamate-ext.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=[YourPublisherName].ollamate-ext)
+[![Version](https://img.shields.io/visual-studio-marketplace/v/KairosynStudio.ollamate-ext.svg?style=flat-square&label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=KairosynStudio.ollamate-ext)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/KairosynStudio.ollamate-ext.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=KairosynStudio.ollamate-ext)
+[![Ratings](https://img.shields.io/visual-studio-marketplace/r/[YourPublisherName].ollamate-ext.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=KairosynStudio.ollamate-ext&ssr=false#review-details)
 
 Bring the power of local Large Language Models directly into your Visual Studio Code workflow with Ollamate! Interact seamlessly with models running via [Ollama](https://ollama.com/) without leaving your editor.
 
-![Ollamate Extension Showcase](https://via.placeholder.com/800x400.png?text=Ollamate+Extension+Showcase+Screenshot)
-*(Replace the placeholder image with a screenshot of your extension in action!)*
+![Ollamate Extension Showcase](assets\ollamateScreenshot.PNG)
 
 ## Features
 
@@ -74,16 +73,6 @@ This extension contributes the following settings (accessible via File > Prefere
 ## Contributing
 
 Contributions, issues, and feature requests are welcome! Please feel free to check the [issues page](https://github.com/darrenjoyner/ollamate-ext/issues).
-
-## Development
-
-To get started with development:
-
-1.  Clone the repository: `git clone https://github.com/darrenjoyner/ollamate-ext.git`
-2.  Install dependencies: `cd [YourRepoName] && npm install`
-3.  Open the project in VS Code.
-4.  Press `F5` to open a new Extension Development Host window.
-5.  Make your changes, and use `Developer: Reload Window` in the host window to see them.
 
 ## License
 
